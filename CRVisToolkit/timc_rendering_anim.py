@@ -24,60 +24,84 @@ steps_data = [b.strip() for b in blocks if b.strip()]
 print(f"Nombre d'images d'animation chargées : {len(steps_data)}")
 r_tube = np.array([3.0e-3, 2.0e-3, 1.0e-3])
 
-# --- 2. Préparation de la FENÊTRE UNIQUE ---
+# --- 2. PRÉPARATION DE L'ÉCRAN PARTAGÉ (Architecture Dashboard) ---
 plt.ion()
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
+# Création d'une figure plus haute pour accueillir les deux graphiques
+fig = plt.figure(figsize=(8, 10))
 
-print("Lancement de l'animation scientifique...")
+# Zone Supérieure (211 = 2 lignes, 1 colonne, position 1) -> ROBOT 3D
+ax_robot = fig.add_subplot(211, projection='3d')
+
+# Zone Inférieure (212 = 2 lignes, 1 colonne, position 2) -> GRAPHIQUE 2D (yTot)
+ax_graph = fig.add_subplot(212)
+
+# Préparation temporaire du graphique du bas pour que l'affichage soit propre
+ax_graph.set_xlim(0, len(steps_data))
+ax_graph.set_ylim(-np.pi, np.pi) # Exemple d'échelle pour un angle de torsion
+ax_graph.set_xlabel("Étape Temporelle (Time step)")
+ax_graph.set_ylabel("Paramètre de torsion (rad) - À venir")
+ax_graph.grid(True)
+ax_graph.set_title("Évolution temporelle des paramètres de yTot")
+
+print("Lancement de l'animation pré-structurée...")
 
 for step_idx, step_str in enumerate(steps_data):
-    ax.cla() # Nettoyage de la frame précédente
+    # On nettoie uniquement la zone du robot, pas tout l'écran !
+    ax_robot.cla() 
     
     matrix_lines = [list(map(float, line.split())) for line in step_str.split('\n') if line.strip()]
     matrix_data = np.array(matrix_lines)
     num_nodes = matrix_data.shape[1]
     
-    # Recalcul des limites des tubes (NB_INTEGRATION_NODES = 30)
-    nodes_per_segment = 30
+    # Configuration des nœuds (NB_INTEGRATION_NODES = 30)
+    nodes_per_segment = int(num_nodes / 6)
     tube_end = np.array([2 * nodes_per_segment, 4 * nodes_per_segment, num_nodes])
     
-    # ---- EXTRACTION 100% CONFORME À LA PHYSIQUE ----
+    # ---- EXTRACTION GÉOMÉTRIQUE ET PHYSIQUE COMPLÈTE ----
     g = np.zeros((num_nodes, 16))
     for i in range(num_nodes):
         M = np.eye(4)
-        # 1. On extrait la vraie position (X, Y, Z)
+        # Position exacte
         M[0, 3] = matrix_data[0, i]
         M[1, 3] = matrix_data[1, i]
         M[2, 3] = matrix_data[2, i]
         
-        # 2. On extrait la VRAIE matrice de rotation issue du modèle de Quentin
-        # Les lignes 3 à 11 du fichier texte correspondent aux 9 éléments de la matrice R
+        # Vraie rotation R issue de Quentin (lignes 3 à 11)
         R_elements = matrix_data[3:12, i] 
-        M[0:3, 0:3] = R_elements.reshape((3, 3), order='F') # On reconstruit R proprement
+        M[0:3, 0:3] = R_elements.reshape((3, 3), order='F')
         
-        # Enregistrement au format colonne (order='F') exigé par le labo de Toronto
         g[i, :] = M.flatten(order='F')
     
-    # ---- AFfICHAGE VIA LA FONCTION OFFICIELLE ----
-    # N'oublie pas d'avoir configuré draw_ctcr.py pour accepter l'argument 'ax' comme vu avant
-    draw_ctcr(g, tube_end, r_tube, tipframe=True, ax=ax)
+    # ---- AFFICHAGE DU ROBOT DANS LA ZONE SUPÉRIEURE ----
+    draw_ctcr(g, tube_end, r_tube, tipframe=True, ax=ax_robot)
     
-    # --- CONFIGURATION DE LA BOÎTE (Pour éviter les déformations visuelles) ---
-    ax.set_aspect('equal')
-    ax.set_box_aspect((1, 1, 1))
-    ax.set_xlim3d([-0.09, 0.09])
-    ax.set_ylim3d([-0.09, 0.09])
-    ax.set_zlim3d([0.0, 0.18])
-    ax.view_init(elev=25, azim=-60)
+    # Configuration de la boîte 3D (ax_robot uniquement)
+    ax_robot.set_aspect('equal')
+    ax_robot.set_box_aspect((1, 1, 1))
+    ax_robot.set_xlim3d([-0.09, 0.09])
+    ax_robot.set_ylim3d([-0.09, 0.09])
+    ax_robot.set_zlim3d([0.0, 0.18])
+    ax_robot.view_init(elev=25, azim=-60)
     
-    ax.set_xlabel('X (m)')
-    ax.set_ylabel('Y (m)')
-    ax.set_zlabel('Z (m)')
-    ax.set_title(f"Animation CTCR - Étape {step_idx + 1}/{len(steps_data)}")
+    ax_robot.set_xlabel('X (m)')
+    ax_robot.set_ylabel('Y (m)')
+    ax_robot.set_zlabel('Z (m)')
+    ax_robot.set_title(f"Visualisation 3D - Étape {step_idx + 1}/{len(steps_data)}")
     
+    # ---- ANIMATION TEMPORAIRE DE LA ZONE DU BAS ----
+    # On ajoute juste un point qui avance pour valider que le temps défile de manière synchrone
+    if step_idx == 0:
+        # On crée le point au premier passage
+        cursor, = ax_graph.plot(step_idx, 0, 'ro', markersize=8, label="Position actuelle")
+        ax_graph.legend()
+    else:
+        # On met à jour sa position sans effacer le graphique (gain de vitesse énorme)
+        cursor.set_data([step_idx], [0]) # Le 0 sera remplacé par la vraie valeur de yTot plus tard
+    
+    # Rafraîchissement de la figure globale
     plt.draw()
     plt.pause(0.01)
 
 plt.ioff()
+print("Animation terminée. En attente de fermeture de la fenêtre...")
 plt.show()
