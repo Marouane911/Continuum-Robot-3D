@@ -29,7 +29,15 @@ for i in range(num_nodes):
     M[2, 3] = z_coords[i]
     g[i, :] = M.flatten(order='F')
 
-tube_end = np.array([4, 8, 12])
+nodes_per_segment = 30
+
+# Each tube has two successive segments in this 3-tube model (6 segments in total)
+tube_end = np.array([
+    2 * nodes_per_segment,       # end of tube 1 (node 0 to 60)
+    4 * nodes_per_segment,       # end of tube 2 (node 61 to 120)
+    num_nodes                    # end of tube 3 (node 121 to 180)
+])
+
 r_tube = np.array([3.0e-3, 2.0e-3, 1.0e-3])
 
 print("Affichage du robot CTCR...")

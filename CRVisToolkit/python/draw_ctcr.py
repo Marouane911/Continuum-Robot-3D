@@ -4,8 +4,8 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 from utils import robotindependentmapping, setupfigure
 
-
-def draw_ctcr(g: np.ndarray[np.ndarray[float]], tube_end: np.ndarray[int], r_tube: np.ndarray[float], tipframe: bool=True, segframe: bool=False, baseframe: bool=False, projections: bool=False, baseplate: bool=True) -> None:
+def draw_ctcr(g: np.ndarray[np.ndarray[float]], tube_end: np.ndarray[int], r_tube: np.ndarray[float], 
+              tipframe=True, segframe=False, baseframe=False, projections=False, baseplate=True, ax=None):
     '''
     DRAW_CTCR Creates a figure of a concentric tube continuum robot (ctcr)
 
@@ -48,11 +48,20 @@ def draw_ctcr(g: np.ndarray[np.ndarray[float]], tube_end: np.ndarray[int], r_tub
     if np.max(tube_end) > g.shape[0] or tube_end.size != r_tube.size:
         raise ValueError("Dimension mismatch")
 
-    # Setup figures
-    ax = setupfigure(g=g, seg_end=tube_end, tipframe=tipframe, segframe=segframe, baseframe=baseframe, projections=projections, baseplate=baseplate)
+    # ---- MAROUANE EDIT : On réutilise l'axe s'il est fourni ----
+    if ax is None:
+        ax = setupfigure(g=g, seg_end=tube_end, tipframe=tipframe, segframe=segframe, baseframe=baseframe, projections=projections, baseplate=baseplate)
+    else:
+        # Si on passe un ax (animation), on dessine quand même la baseplate et les repères si demandé
+        if baseplate:
+            # Optionnel : setupfigure s'occupe normalement de ça, mais en mode ax, 
+            # on laisse l'animation gérer les repères fixes pour éviter les doublons.
+            pass
+    # ---------------------------------------------------------------
+
 
     numtubes = tube_end.size
-    radial_pts = 16  # resolution (num point on circular cross section, increase for high detail level)
+    radial_pts = 40  # resolution (num point on circular cross section, increase for high detail level)
     tcirc = np.linspace(0, 2*np.pi, radial_pts)
     alpha = 1  # 0 = transparent
 
@@ -91,7 +100,20 @@ def draw_ctcr(g: np.ndarray[np.ndarray[float]], tube_end: np.ndarray[int], r_tub
 
         start_tube = end_tube
 
-    plt.show()
+
+    # RESHAPE THE BOX
+    # The legal aspect for physical data (no deformation of the robot
+    ax.set_aspect('equal')
+
+    # CUBIQUE SHAPE (X=1, Y=1, Z=1)
+    ax.set_box_aspect((1, 1, 1))
+
+    # Resize the boundary
+    ax.set_xlim3d([-0.09, 0.09])
+    ax.set_ylim3d([-0.09, 0.09])
+    ax.set_zlim3d([0.0, 0.18])
+
+    # plt.show()
 
 
 if "__main__" == __name__:
