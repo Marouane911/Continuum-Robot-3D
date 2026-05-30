@@ -1,6 +1,8 @@
 import sys
 import os
 import numpy as np
+import time
+
 
 # Gestion des imports PyQt5 et Matplotlib
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox
@@ -8,32 +10,39 @@ from PyQt5.QtCore import QTimer, Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-# Import de ta fonction de dessin 3D existante
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, ".."))
-sys.path.append(os.path.join(project_root, "python"))
+# --- GESTION DU REPERTOIRE DE PYTHON (Dossier frère) ---
+current_dir = os.path.dirname(os.path.abspath(__file__)) # ~/CRVisToolkit/gui
+root_toolkit = os.path.dirname(current_dir)              # ~/CRVisToolkit
+python_dir = os.path.join(root_toolkit, "python")        # ~/CRVisToolkit/python
 
-try:
-    from draw_ctcr import draw_ctcr
-except ImportError:
-    sys.path.append(project_root)
-    from python.draw_ctcr import draw_ctcr
+if python_dir not in sys.path:
+    sys.path.append(python_dir)
+
 
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("CRVisToolkit - CTR Control Dashboard")
+        self.setWindowTitle("CRVisToolkit - CTR Control Dashboard (Version Blindée)")
         self.setGeometry(100, 100, 1400, 900)
 
-        # --- Données et Trajectoire ---
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        timc_robotics_root = os.path.abspath(os.path.join(current_dir, "..", ".."))
-        self.data_path = os.path.join(timc_robotics_root, "Modeling-and-Control-of-Concentric-Tube-Continuum-Robots", "build", "robot_backbone.txt")
+        # --- RECONSTRUCTION DU CHEMIN ABSOLU VERS LE REPO DE QUENTIN ---
+        project_parent = os.path.dirname(root_toolkit)
+        
+        self.data_path = os.path.join(
+            project_parent, 
+            "Modeling-and-Control-of-Concentric-Tube-Continuum-Robots", 
+            "build", 
+            "robot_backbone.txt"
+        )
 
         self.steps_data = []
         self.current_step = 0
-        self.r_tube = np.array([1.52e-3, 1.80e-3, 2.35e-3]) / 2.0
-        self.l_kappa = 0.040 
+        
+        # Rayons externes exacts issus de parameters.csv (rOut1, rOut2, rOut3)
+        self.r_tube = np.array([0.000762, 0.0009, 0.001175])
+        
+        # Définition de la longueur de précourbure (50 mm d'après le csv)
+        self.l_kappa = 0.05 
 
         self.load_trajectory_data()
 
@@ -45,6 +54,7 @@ class MainApp(QMainWindow):
         self.is_playing = False
 
     def load_trajectory_data(self):
+        """Parser horizontal : Valide les blocs contenant exactement 19 lignes de variables."""
         if not os.path.exists(self.data_path):
             print(f"Erreur : Fichier introuvable à l'emplacement : {self.data_path}")
             self.steps_data = []
@@ -52,10 +62,19 @@ class MainApp(QMainWindow):
 
         with open(self.data_path, "r") as f:
             content = f.read()
+            
         blocks = content.strip().split("--- STEP_BREAK ---")
-        self.steps_data = [b.strip() for b in blocks if b.strip()]
+        self.steps_data = []
+        
+        for b in blocks:
+            lines = [l.strip() for l in b.split('\n') if l.strip()]
+            
+            if len(lines) == 19:
+                matrix_lines = [list(map(float, line.split())) for line in lines]
+                self.steps_data.append(np.array(matrix_lines))
+                
         print(f"[{len(self.steps_data)}] étapes d'animation chargées avec succès.")
-
+    
     def init_ui(self):
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
@@ -79,7 +98,6 @@ class MainApp(QMainWindow):
         self.btn_reset.clicked.connect(self.reset_animation)
         control_layout.addWidget(self.btn_reset)
         
-        # Choix du graphique à afficher
         control_layout.addWidget(QLabel("Sélection du Graphique :"))
         self.graph_selector = QComboBox()
         self.graph_selector.addItems(["Orientations (X, Y, Z)", "Torsion relative (Vue MICRO)"])
@@ -92,19 +110,13 @@ class MainApp(QMainWindow):
         # --- ZONE GRAPHIQUE MATPLOTLIB (DROITE) ---
         self.fig = Figure(figsize=(12, 8))
         self.canvas = FigureCanvas(self.fig)
-        
-        # Attribution d'un ratio d'affichage (Panneau: 1, Graphiques: 5) pour donner un maximum d'espace
         main_layout.addWidget(self.canvas, stretch=5)
 
-        # Configuration : Moitié gauche = Robot 3D, Moitié droite = Le graphique unique choisi
         self.ax_robot = self.fig.add_subplot(121, projection='3d') 
         self.ax_plots = self.fig.add_subplot(122)                  
 
-        # FIXATION STRICTE DE LA VUE (Désactive les mouvements à la souris)
         self.ax_robot.view_init(elev=20, azim=-45)
         self.ax_robot.disable_mouse_rotation()
-
-        # Ajustement manuel des marges pour créer un espace net entre le robot et les graphiques
         self.fig.subplots_adjust(left=0.05, right=0.95, wspace=0.35)
 
     def toggle_animation(self):
@@ -138,13 +150,12 @@ class MainApp(QMainWindow):
         self.current_step += 1
 
     def update_plots(self):
+        t0 = time.perf_counter()
         if not self.steps_data or self.current_step >= len(self.steps_data):
             return
 
-        # 1. Récupération de la frame actuelle
-        step_str = self.steps_data[self.current_step]
-        matrix_lines = [list(map(float, line.split())) for line in step_str.split('\n') if line.strip()]
-        matrix_data = np.array(matrix_lines)
+        # Récupération de la matrice (19, N) pré-filtrée
+        matrix_data = self.steps_data[self.current_step]
         num_nodes = matrix_data.shape[1]
 
         nodes_per_seg = int(num_nodes / 3)
@@ -152,116 +163,179 @@ class MainApp(QMainWindow):
         n2 = 2 * nodes_per_seg  
         tube_end = np.array([n1, n2, num_nodes])
 
-        # Sauvegarde de la vue caméra
+        print("num_nodes =", num_nodes)
+        print("n1 =", n1)
+        print("n2 =", n2)
+        print("tube_end =", tube_end)
+
         current_elev = self.ax_robot.elev
         current_azim = self.ax_robot.azim
 
         self.ax_robot.cla()
         self.ax_plots.cla()
-
         self.ax_robot.view_init(elev=current_elev, azim=current_azim)
 
-        # 2. Reconstruction géométrique
-        g = np.zeros((num_nodes, 16))
-        for i in range(num_nodes):
-            M = np.eye(4)
-            M[0, 3] = matrix_data[0, i] # X
-            M[1, 3] = matrix_data[1, i] # Y
-            M[2, 3] = matrix_data[2, i] # Z
-            R = matrix_data[3:12, i].reshape((3, 3), order='F')
-            M[0:3, 0:3] = R
-            g[i, :] = M.flatten(order='F')
 
-        # --- A. RECONSTRUCTION DU ROBOT 3D ---
-        draw_ctcr(g, tube_end, self.r_tube, tipframe=True, ax=self.ax_robot)
+        # --- A. RENDU DU ROBOT 3D OPTIMIZED---
 
-        # AJOUT DES AXES DE RÉFÉRENCE À LA BASE (0,0,0)
-        longueur_axe = 0.03
-        self.ax_robot.quiver(0, 0, 0, longueur_axe, 0, 0, color='r', linewidth=2, label='Axe X')
-        self.ax_robot.quiver(0, 0, 0, 0, longueur_axe, 0, color='g', linewidth=2, label='Axe Y')
-        self.ax_robot.quiver(0, 0, 0, 0, 0, longueur_axe, color='b', linewidth=2, label='Axe Z')
+        xyz = matrix_data[0:3, :]
 
-        self.ax_robot.set_aspect('equal')
+        x = xyz[0]
+        y = xyz[1]
+        z = xyz[2]
+
+        scale = 1
+
+        # Tube externe
+        self.ax_robot.plot(
+            x[:n1],
+            y[:n1],
+            z[:n1],
+            linewidth=1.524 * scale,
+            color='red'
+        )
+
+        # Tube intermédiaire
+        self.ax_robot.plot(
+            x[:n2],
+            y[:n2],
+            z[:n2],
+            linewidth=1.800 * scale,
+            color='green'
+        )
+
+        # Tube interne
+        self.ax_robot.plot(
+            x,
+            y,
+            z,
+            linewidth=2.350 * scale,
+            color='blue'
+        )
+
+        # Pointe
+        self.ax_robot.scatter(
+            x[-1],
+            y[-1],
+            z[-1],
+            s=40
+        )
+
+        # Axes du repère
+        axis_len = 0.03
+
+        self.ax_robot.quiver(
+            0, 0, 0,
+            axis_len, 0, 0,
+            color='r'
+        )
+
+        self.ax_robot.quiver(
+            0, 0, 0,
+            0, axis_len, 0,
+            color='g'
+        )
+
+        self.ax_robot.quiver(
+            0, 0, 0,
+            0, 0, axis_len,
+            color='b'
+        )
+
+        self.ax_robot.set_title("CTR 3D")
+
         self.ax_robot.set_box_aspect((1, 1, 1))
-        self.ax_robot.set_xlim3d([-0.05, 0.05])
-        self.ax_robot.set_ylim3d([-0.05, 0.05])
-        self.ax_robot.set_zlim3d([0.0, 0.18])
-        self.ax_robot.set_title("Géométrie du Robot CTR")
 
-        # Calcul de la longueur curviligne réelle pour l'axe X
-        length_axis = np.zeros(num_nodes)
-        for i in range(1, num_nodes):
-            dl = np.sqrt((matrix_data[0, i]-matrix_data[0, i-1])**2 + 
-                         (matrix_data[1, i]-matrix_data[1, i-1])**2 + 
-                         (matrix_data[2, i]-matrix_data[2, i-1])**2)
-            length_axis[i] = length_axis[i-1] + dl
+        self.ax_robot.set_xlim(-0.09, 0.09)
+        self.ax_robot.set_ylim(-0.09, 0.09)
+        self.ax_robot.set_zlim(0.0, 0.18)
 
-        # --- B. AFFICHAGE DU GRAPHIQUE SÉLECTIONNÉ ---
+        # Calcul de la longueur curviligne réelle
+        xyz = matrix_data[0:3, :].T
+
+        dxyz = np.diff(xyz, axis=0)
+
+        dl = np.linalg.norm(dxyz, axis=1)
+
+        length_axis = np.concatenate(([0], np.cumsum(dl)))
+
+        # --- B. GRAPHES ---
         selected_graph = self.graph_selector.currentIndex()
 
-
-
         if selected_graph == 0:
-            # --- CAS 1 : ANGLES DIRECTEURS DE LA STRUCTURE (Par rapport aux axes fixes X, Y, Z) ---
+            # Angles directeurs
             orient_X = np.zeros(num_nodes)
             orient_Y = np.zeros(num_nodes)
             orient_Z = np.zeros(num_nodes)
 
             for i in range(num_nodes):
-                R = matrix_data[3:12, i].reshape((3, 3), order='F')
-                
-                t_x = R[0, 2]
-                t_y = R[1, 2]
-                t_z = R[2, 2]
+                R = matrix_data[3:12, i].reshape((3, 3), order='C')
+                t_x, t_y, t_z = R[0, 2], R[1, 2], R[2, 2] 
 
                 orient_X[i] = np.degrees(np.arccos(np.clip(t_x, -1.0, 1.0))) 
                 orient_Y[i] = np.degrees(np.arccos(np.clip(t_y, -1.0, 1.0))) 
                 orient_Z[i] = np.degrees(np.arccos(np.clip(t_z, -1.0, 1.0))) 
 
-            # Correction stricte des couleurs : r=Rouge=X, g=Vert=Y, b=Bleu=Z
             self.ax_plots.plot(length_axis, orient_X, 'r-', linewidth=2, label="Orientation / Axe X")
             self.ax_plots.plot(length_axis, orient_Y, 'g-', linewidth=2, label="Orientation / Axe Y")
             self.ax_plots.plot(length_axis, orient_Z, 'b-', linewidth=2, label="Orientation / Axe Z")
-            
-            self.ax_plots.set_title("Orientation du CTR")
-            self.ax_plots.set_ylabel("Angle par rapport à l'axe de référence (en degrés)", labelpad=12) # labelpad évite le chevauchement
-            self.ax_plots.set_ylim([0, 120]) # Plus zoomé et lisible que 180
-
-
+            self.ax_plots.set_title("Orientation du CTR", fontsize=11, fontweight='bold')
+            self.ax_plots.set_ylabel("Angle de référence (degrés)", labelpad=12)
+            self.ax_plots.set_ylim([0, 120])
         else:
-            # --- CAS 2 : TORSION RELATIVE (VUE MICRO) ---
+            # Torsion relative
             theta_2 = matrix_data[17, :]
             theta_3 = matrix_data[18, :]
 
             t2_display = np.copy(theta_2)
             t3_display = np.copy(theta_3)
+
             t3_display[n1:] = np.nan 
             t2_display[n2:] = np.nan
 
             self.ax_plots.plot(length_axis, t2_display, 'b-o', markersize=3, label=r"$\theta_2$ (intermédiaire)")
             self.ax_plots.plot(length_axis, t3_display, 'r-o', markersize=3, label=r"$\theta_3$ (externe)")
-            self.ax_plots.axhline(y=0, color='black', linestyle='-', alpha=0.3, label=r"$\theta_1 = 0$")
+            self.ax_plots.axhline(y=0, color='black', linestyle='-', alpha=0.5, label=r"$\theta_1 = 0$ (Réf. interne)")
 
-            l_transition1 = length_axis[n1 - 1]
-            l_transition2 = length_axis[n2 - 1]
-            self.ax_plots.axvline(x=l_transition1, color='gray', linestyle='--', alpha=0.8, label="Fin Tube 3")
-            self.ax_plots.axvline(x=l_transition2, color='gray', linestyle='--', alpha=0.8, label="Fin Tube 2")
+            l_transition1 = length_axis[n1 - 1] 
+            l_transition2 = length_axis[n2 - 1] 
+            
+            self.ax_plots.axvline(x=l_transition1, color='red', linestyle='--', alpha=0.7, label="Fin Tube 3 (Ext)")
+            self.ax_plots.axvline(x=l_transition2, color='blue', linestyle='--', alpha=0.7, label="Fin Tube 2 (Int)")
 
-            if (l_transition2 - 0.03) > 0:
-                self.ax_plots.axvline(x=(l_transition2 - 0.03), color='purple', linestyle=':', alpha=0.6, label=r"$L - l_\kappa$")
+            # Zones de précourbure
+            start_curve_t3 = l_transition1 - self.l_kappa
+            if start_curve_t3 > 0:
+                self.ax_plots.axvline(x=start_curve_t3, color='darkorange', linestyle=':', linewidth=2.5, 
+                                      label=r"Début Précourbure Tube 3")
+                self.ax_plots.axvspan(start_curve_t3, l_transition1, color='orange', alpha=0.07, zorder=1)
 
-            self.ax_plots.set_title("Vue MICRO : Torsion relative (Réf: Tube 1)")
-            self.ax_plots.set_ylabel("Torsion relative (rad)")
+            start_curve_t2 = l_transition2 - self.l_kappa
+            if start_curve_t2 > 0:
+                self.ax_plots.axvline(x=start_curve_t2, color='purple', linestyle=':', linewidth=2.5, 
+                                      label=r"Début Précourbure Tube 2")
+                self.ax_plots.axvspan(start_curve_t2, l_transition2, color='purple', alpha=0.04, zorder=1)
 
-        # Paramètres communs aux graphiques
+            self.ax_plots.set_title("Profil de Torsion & Frontières de Précourbure", fontsize=11, fontweight='bold')
+            self.ax_plots.set_ylabel("Torsion relative (rad)", labelpad=10)
+            
+            # Limites dynamiques
+            min_y = np.nanmin(matrix_data[17:19, :])
+            max_y = np.nanmax(matrix_data[17:19, :])
+            self.ax_plots.set_ylim([min_y - 0.01, max_y + 0.01])
+
+        # --- CORRECTION DES QUADRILLAGES ---
         self.ax_plots.set_xlabel("Longueur curviligne du robot (m)")
         self.ax_plots.set_xlim([0, length_axis[-1]])
-        self.ax_plots.grid(True)
-        self.ax_plots.legend(loc="best")
+        
+        self.ax_plots.grid(True, linestyle=':', alpha=0.6, zorder=2)
+        self.ax_plots.legend(loc="upper right", fontsize=9, framealpha=0.9)
 
-        # On applique la séparation forcée définie dans init_ui
         self.fig.subplots_adjust(left=0.05, right=0.95, wspace=0.35)
-        self.canvas.draw()
+        t1 = time.perf_counter()
+        print("total :", round((t1 - t0) * 1000, 1), "ms")
+        print("----------------")
+        self.canvas.draw_idle()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

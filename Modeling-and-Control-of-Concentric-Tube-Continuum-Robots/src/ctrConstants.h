@@ -15,7 +15,7 @@ namespace CtrLib{
 
     // Parameters
     constexpr int NB_TUBES = 3;                        // number of tubes (Do not change this parameter, some parts of the code are hard-coded for a 3-tube CTR. Generalization to n-tube CTR will be implemented later.)
-    constexpr int NB_INTEGRATION_NODES = 6;               // number of integration nodes per segment (Increasing this value, e.g to 5, yield smoother shaper in the 3d plot, but at the cost of slower computation)
+    constexpr int NB_INTEGRATION_NODES = 60;               // number of integration nodes per segment (Increasing this value, e.g to 5, yield smoother shaper in the 3d plot, but at the cost of slower computation)
 
     // Do not change these constants, as they are automatically computed from the parameters.
     constexpr int NB_SEGMENT_MAX = 2 * NB_TUBES;            // max number of segments
