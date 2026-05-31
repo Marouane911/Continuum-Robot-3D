@@ -128,7 +128,17 @@ namespace CtrLib{
           #pragma omp atomic write
           segmentingError = true;
         }
-        Matrix_yTot yTot;
+
+        // Tentative de debug avec :
+        // std::cout
+        // << "iEnd = "
+        // << segmented_out.iEnd.transpose()
+        // << std::endl;
+
+        // Matrix_yTot yTot; Ne remplit pas totalement yTot se qui entraine que les dernières colonnes sont replies par des valeurs déchets de la mémoire
+        // Tentative de debug avec :
+        Matrix_yTot yTot = Matrix_yTot::Constant(-999.0);
+
         solveIVP(yu0_i, q_i, segmented_out, w_i, yTot);
         if(i == 0){
           out.yTot = yTot;

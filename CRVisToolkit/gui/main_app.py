@@ -2,6 +2,11 @@ import sys
 import os
 import numpy as np
 import time
+import subprocess
+
+from PyQt5.QtWidgets import QDoubleSpinBox
+from PyQt5.QtCore import QLocale
+from PyQt5.QtWidgets import QCheckBox
 
 
 # Gestion des imports PyQt5 et Matplotlib
@@ -22,6 +27,9 @@ if python_dir not in sys.path:
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
+        QLocale.setDefault(
+            QLocale(QLocale.English, QLocale.UnitedStates)
+        )
         self.setWindowTitle("CRVisToolkit - CTR Control Dashboard (Version Blindée)")
         self.setGeometry(100, 100, 1400, 900)
 
@@ -53,6 +61,22 @@ class MainApp(QMainWindow):
         self.timer.timeout.connect(self.update_animation)
         self.is_playing = False
 
+        # --- Mémoriser la dérnière configuration pour l'animation entre 2 positions entrées ---
+        self.current_q = [
+            -0.30,
+            -0.20,
+            -0.10,
+            0.0,
+            0.0,
+            0.0
+        ]
+
+        self.saved_elev = 20
+        self.saved_azim = -45
+
+        self.compute_ctr_configuration(self.current_q)
+        
+
     def load_trajectory_data(self):
         """Parser horizontal : Valide les blocs contenant exactement 19 lignes de variables."""
         if not os.path.exists(self.data_path):
@@ -70,8 +94,26 @@ class MainApp(QMainWindow):
             lines = [l.strip() for l in b.split('\n') if l.strip()]
             
             if len(lines) == 19:
+                lengths = [len(line.split()) for line in lines]
+
+                print("Nombre de colonnes par ligne :", lengths)
+
                 matrix_lines = [list(map(float, line.split())) for line in lines]
-                self.steps_data.append(np.array(matrix_lines))
+
+                arr = np.array(matrix_lines)
+
+                print("Shape chargée :", arr.shape)
+
+                z = arr[2,:]
+
+                print(
+                    "z range :",
+                    np.min(z),
+                    "->",
+                    np.max(z)
+                )
+
+                self.steps_data.append(arr)                
                 
         print(f"[{len(self.steps_data)}] étapes d'animation chargées avec succès.")
     
@@ -95,14 +137,91 @@ class MainApp(QMainWindow):
         control_layout.addWidget(self.btn_play)
 
         self.btn_reset = QPushButton("Réinitialiser")
+        self.btn_home = QPushButton("Position par défaut")
+        self.btn_home.clicked.connect(self.go_home)
+        control_layout.addWidget(self.btn_home)
         self.btn_reset.clicked.connect(self.reset_animation)
         control_layout.addWidget(self.btn_reset)
+
+        # ----------------------------------
+        # Actionneurs CTR
+        # ----------------------------------
+
+        control_layout.addWidget(QLabel("Actionneurs CTR"))
+
+        self.q_inputs = []
+
+        default_values = [
+            -0.30,
+            -0.20,
+            -0.10,
+            0.0,
+            0.0,
+            0.0
+        ]
+
+        for i in range(6):
+
+            control_layout.addWidget(QLabel(f"q{i}"))
+
+            spinbox = QDoubleSpinBox()
+            spinbox.setLocale(
+                QLocale(QLocale.English, QLocale.UnitedStates)
+            )
+
+            # Translations
+            if i < 3:
+                spinbox.setRange(-0.40, 0.05)
+                spinbox.setDecimals(4)
+                spinbox.setSingleStep(0.005)
+
+            # Rotations
+            else:
+                spinbox.setRange(-6.28318, 6.28318)
+                spinbox.setDecimals(3)
+                spinbox.setSingleStep(0.1)
+
+            spinbox.setValue(default_values[i])
+
+            self.q_inputs.append(spinbox)
+
+            spinbox.valueChanged.connect(
+                self.on_spinbox_changed
+            )
+
+            control_layout.addWidget(spinbox)
+
+
+        # - Actionneurs POSITION PAR DÉFAUT -
+        self.home_q = [
+            -0.30,
+            -0.20,
+            -0.10,
+            0.0,
+            0.0,
+            0.0
+        ]
+
         
         control_layout.addWidget(QLabel("Sélection du Graphique :"))
         self.graph_selector = QComboBox()
         self.graph_selector.addItems(["Orientations (X, Y, Z)", "Torsion relative (Vue MICRO)"])
         self.graph_selector.currentIndexChanged.connect(self.update_plots)
         control_layout.addWidget(self.graph_selector)
+
+        self.auto_apply_checkbox = QCheckBox("Appliquer automatiquement")
+
+        control_layout.addWidget(
+            self.auto_apply_checkbox
+        )
+
+        # - Bouton -
+        self.btn_apply = QPushButton("Appliquer configuration")
+        self.btn_apply.clicked.connect(
+            self.apply_configuration
+        )
+
+        control_layout.addWidget(self.btn_apply)
 
         control_layout.addStretch()
         main_layout.addWidget(control_panel)
@@ -116,9 +235,118 @@ class MainApp(QMainWindow):
         self.ax_plots = self.fig.add_subplot(122)                  
 
         self.ax_robot.view_init(elev=20, azim=-45)
-        self.ax_robot.disable_mouse_rotation()
+        # self.ax_robot.disable_mouse_rotation()
+        self.canvas.mpl_connect(
+            "button_release_event",
+            self.on_view_changed
+        )
         self.fig.subplots_adjust(left=0.05, right=0.95, wspace=0.35)
+    
+    def go_home(self):
+        for i in range(6):
+            self.q_inputs[i].setValue(
+                self.home_q[i]
+            )
 
+        self.apply_configuration()
+    
+    def on_spinbox_changed(self):
+
+        if self.auto_apply_checkbox.isChecked():
+
+            q_values = [
+                self.q_inputs[i].value()
+                for i in range(6)
+            ]
+
+            self.compute_ctr_configuration(q_values)
+
+            self.current_q = list(q_values)
+            
+    def apply_configuration(self):
+
+        q_values = [
+            self.q_inputs[i].value()
+            for i in range(6)
+        ]
+
+        self.animate_to_configuration(
+            q_values
+        )
+
+
+    def compute_ctr_configuration(self, q_values):
+
+
+        try:
+
+            project_parent = os.path.dirname(root_toolkit)
+
+            executable = os.path.join(
+                project_parent,
+                "Modeling-and-Control-of-Concentric-Tube-Continuum-Robots",
+                "build",
+                "demo",
+                "004_interactive_control"
+            )
+
+            cmd = [executable] + [ # q_value contient float et subprocess.run() attend str
+                str(q)
+                for q in q_values
+            ]
+            print(executable) # VÉRIF
+
+            build_dir = os.path.join(
+                project_parent,
+                "Modeling-and-Control-of-Concentric-Tube-Continuum-Robots",
+                "build"
+            )
+
+            result = subprocess.run(
+                cmd,
+                cwd=build_dir,
+                capture_output=True,
+                text=True
+            )
+
+            print(result.stdout)
+
+            self.load_trajectory_data()
+
+            self.current_step = 0
+
+            self.update_plots()
+
+
+        except Exception as e:
+
+            print("Erreur :", e)
+    
+    def animate_to_configuration(self, target_q):
+
+        n_steps = 10
+
+        q_start = np.array(self.current_q)
+        q_target = np.array(target_q)
+
+        for alpha in np.linspace(
+            0.0,
+            1.0,
+            n_steps + 1
+        )[1:]:
+
+            q_interp = (
+                (1 - alpha) * q_start + alpha * q_target
+            )
+
+            self.compute_ctr_configuration(
+                q_interp.tolist()
+            )
+
+            QApplication.processEvents()
+
+        self.current_q = list(target_q)
+        
     def toggle_animation(self):
         if not self.steps_data:
             return
@@ -129,6 +357,13 @@ class MainApp(QMainWindow):
             self.timer.start(50) 
             self.btn_play.setText("Pause")
         self.is_playing = not self.is_playing
+
+
+    def on_view_changed(self, event):
+
+        self.saved_elev = self.ax_robot.elev
+        self.saved_azim = self.ax_robot.azim
+
 
     def reset_animation(self):
         self.timer.stop()
@@ -156,6 +391,8 @@ class MainApp(QMainWindow):
 
         # Récupération de la matrice (19, N) pré-filtrée
         matrix_data = self.steps_data[self.current_step]
+
+
         num_nodes = matrix_data.shape[1]
 
         nodes_per_seg = int(num_nodes / 3)
@@ -163,13 +400,13 @@ class MainApp(QMainWindow):
         n2 = 2 * nodes_per_seg  
         tube_end = np.array([n1, n2, num_nodes])
 
-        print("num_nodes =", num_nodes)
-        print("n1 =", n1)
-        print("n2 =", n2)
-        print("tube_end =", tube_end)
+        # print("num_nodes =", num_nodes)
+        # print("n1 =", n1)
+        # print("n2 =", n2)
+        # print("tube_end =", tube_end)
 
-        current_elev = self.ax_robot.elev
-        current_azim = self.ax_robot.azim
+        current_elev = getattr(self, "saved_elev", 20)
+        current_azim = getattr(self, "saved_azim", -45)
 
         self.ax_robot.cla()
         self.ax_plots.cla()
@@ -184,7 +421,55 @@ class MainApp(QMainWindow):
         y = xyz[1]
         z = xyz[2]
 
-        scale = 1
+        # --- DÉBUGGING ---
+        print("\n========== DEBUG CTR ==========")
+
+        print("q =", [f"{v:.6f}" for v in self.current_q])
+
+        print("shape =", matrix_data.shape)
+
+        print("z min =", np.min(z))
+        print("z max =", np.max(z))
+
+        print("num_nodes =", num_nodes)
+
+        print("base =", x[0], y[0], z[0])
+        print("tip  =", x[-1], y[-1], z[-1])
+
+        print("tube 1 end =", x[n1-1], y[n1-1], z[n1-1])
+        print("tube 2 end =", x[n2-1], y[n2-1], z[n2-1])
+
+        print("n1 =", n1)
+        print("n2 =", n2)
+
+        print(
+            "point n1 =",
+            x[n1-1],
+            y[n1-1],
+            z[n1-1]
+        )
+
+        print(
+            "point n2 =",
+            x[n2-1],
+            y[n2-1],
+            z[n2-1]
+        )
+
+        print(
+            "finite =",
+            np.isfinite(matrix_data).all()
+        )
+
+        print("===============================\n")
+        # print("------ POINTS CLÉS ------")
+        # print("0      :", x[0], y[0], z[0])
+        # print("n1-1   :", x[n1-1], y[n1-1], z[n1-1])
+        # print("n2-1   :", x[n2-1], y[n2-1], z[n2-1])
+        # print("last   :", x[-1], y[-1], z[-1])
+        # print("-------------------------")
+
+        scale = 2
 
         # Tube externe
         self.ax_robot.plot(
@@ -192,7 +477,7 @@ class MainApp(QMainWindow):
             y[:n1],
             z[:n1],
             linewidth=1.524 * scale,
-            color='red'
+            color='black'
         )
 
         # Tube intermédiaire
@@ -201,7 +486,7 @@ class MainApp(QMainWindow):
             y[:n2],
             z[:n2],
             linewidth=1.800 * scale,
-            color='green'
+            color='dimgray'
         )
 
         # Tube interne
@@ -210,7 +495,7 @@ class MainApp(QMainWindow):
             y,
             z,
             linewidth=2.350 * scale,
-            color='blue'
+            color='lightgray'
         )
 
         # Pointe
@@ -242,7 +527,7 @@ class MainApp(QMainWindow):
             color='b'
         )
 
-        self.ax_robot.set_title("CTR 3D")
+        self.ax_robot.set_title("Modélisation CTR en 3D")
 
         self.ax_robot.set_box_aspect((1, 1, 1))
 
@@ -333,8 +618,8 @@ class MainApp(QMainWindow):
 
         self.fig.subplots_adjust(left=0.05, right=0.95, wspace=0.35)
         t1 = time.perf_counter()
-        print("total :", round((t1 - t0) * 1000, 1), "ms")
-        print("----------------")
+        # print("total :", round((t1 - t0) * 1000, 1), "ms")
+        # print("----------------")
         self.canvas.draw_idle()
 
 if __name__ == "__main__":

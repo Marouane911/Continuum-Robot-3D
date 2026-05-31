@@ -23,6 +23,15 @@ namespace CtrLib{
     const Matrix_segmented &UUx  =  segmented.UUx;
     const int               nSeg =  segmented.iEnd(0) + 1;
 
+    // TRYING TO DEBUG ----------------------
+    // std::cout
+    //   << "nSeg = "
+    //   << nSeg
+    //   << " -> colonnes utilisées = "
+    //   << nSeg * NB_INTEGRATION_NODES
+    //   << std::endl;
+    // --------------------------------------
+
     
     // For better convergence, the two first elements of the initial guess (yu0(0) and yu0(1)) are the sum of bending moments along x and y axis (at s=0)
     // But the ODEs are implemented using curvature along x and y axis as state variables
@@ -62,6 +71,7 @@ namespace CtrLib{
       
     Vector3d u1_0;
     u1_0 << u1x_0, u1y_0, u1z_0;
+
 
     for(int seg = 0; seg < nSeg; seg++){  // For each segment
       // Construct vector of initial state variables

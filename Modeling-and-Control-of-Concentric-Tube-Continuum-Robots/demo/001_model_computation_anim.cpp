@@ -41,6 +41,8 @@ int main(int, char**)
     constexpr int num_steps = 100;
 
     Vector_q q;
+    Vector_q q_last_valid;
+    bool has_valid_configuration = false;
 
     for(int step = 0; step < num_steps; ++step)
     {
@@ -120,39 +122,43 @@ int main(int, char**)
         // CALCUL MODELE
         //--------------------------------------------------
 
-        Vector_q q_last_valid = q;
-
-        if(ctr.Compute(q,opt) < 0){
-            
-        std::cout
-            << "Configuration invalide au step "
-            << step
-            << ", réutilisation de la dernière forme valide."
-            << std::endl;
-
-        ctr.Compute(q_last_valid,opt);
-
-        auto yTot = ctr.GetYTot(); // Forme géométrique initiale
-
-        for(int row=0; row<yTot.rows(); ++row)
+        if(ctr.Compute(q,opt) < 0)
         {
-            for(int col=0; col<yTot.cols(); ++col)
-            {
-                dataFile << yTot(row,col);
+            std::cout
+                << "Configuration invalide au step "
+                << step
+                << ", réutilisation de la dernière forme valide."
+                << std::endl;
 
-                if(col < yTot.cols()-1)
-                    dataFile << " ";
+            if(has_valid_configuration)
+            {
+                ctr.Compute(q_last_valid,opt);
+
+                auto yTot = ctr.GetYTot();
+
+                for(int row=0; row<yTot.rows(); ++row)
+                {
+                    for(int col=0; col<yTot.cols(); ++col)
+                    {
+                        dataFile << yTot(row,col);
+
+                        if(col < yTot.cols()-1)
+                            dataFile << " ";
+                    }
+
+                    dataFile << "\n";
+                }
+
+                dataFile << "--- STEP_BREAK ---\n";
             }
 
-            dataFile << "\n";
+            continue;
         }
 
-        dataFile << "--- STEP_BREAK ---\n";
+        // on arrive ici seulement si Compute a réussi
 
-        continue;
-    }
-
-    q_last_valid = q;
+        q_last_valid = q;
+        has_valid_configuration = true;
 
         //--------------------------------------------------
         // RECUPERATION DONNEES
