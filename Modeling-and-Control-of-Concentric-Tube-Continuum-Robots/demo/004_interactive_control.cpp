@@ -142,6 +142,8 @@ int main(int argc, char** argv)
     // SAUVEGARDE
     //--------------------------------------------------
 
+    std::ofstream file("robot_backbone.txt");
+
     // VÉRIF DEBUGGING --------------
     std::cout << "\n===== SEGMENTATION =====\n";
 
@@ -183,10 +185,22 @@ int main(int argc, char** argv)
         << std::endl;
     }
 
+    file << "# iEnd "
+        << ctr.segmented.iEnd(0) << " "
+        << ctr.segmented.iEnd(1) << " "
+        << ctr.segmented.iEnd(2) << "\n";
+
+    file << "# S ";
+
+    for(int i=0;i<NB_SEGMENT_MAX;i++)
+    {
+        file << ctr.segmented.S(i) << " ";
+    }
+
+    file << "\n";
+
     std::cout << "================\n";
     // ---------------------
-
-    std::ofstream file("robot_backbone.txt");
 
 
     // VÉRIF DEBUGGING --------------
@@ -225,6 +239,7 @@ int main(int argc, char** argv)
 
         file << "\n";
     }
+    
 
     file << "--- STEP_BREAK ---\n";
 

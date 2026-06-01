@@ -46,7 +46,9 @@ namespace CtrLib{
         r_s = R.col(2); // = R * e3
         R_s = R * hat(u1); 
 
-        Vector3d thetha_s(0, uz(1) - uz(0), uz(2) - uz(0));
+        Vector3d thetha_s(0,
+            uz(1) - uz(0),
+            uz(2) - uz(0));
         Vector3d e3(0,0,1);
         
         Matrix3d K_i[NB_TUBES];
