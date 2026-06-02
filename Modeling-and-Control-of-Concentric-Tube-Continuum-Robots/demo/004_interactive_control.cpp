@@ -82,30 +82,30 @@ int main(int argc, char** argv)
     auto yTot = ctr.GetYTot();
 
     // VÉRIF DEBUGGING --------------
-    std::cout << "\n=== Z FIN ===\n";
+    // std::cout << "\n=== Z FIN ===\n";
 
-    for(int col = 295; col < 360; col += 5)
-    {
-        std::cout
-            << col
-            << " -> "
-            << yTot(2,col)
-            << std::endl;
-    }
+    // for(int col = 295; col < 360; col += 5)
+    // {
+    //     std::cout
+    //         << col
+    //         << " -> "
+    //         << yTot(2,col)
+    //         << std::endl;
+    // }
 
     // VÉRIF DEBUGGING --------------
-    std::cout
-    << "yTot.cols() = "
-    << yTot.cols()
-    << std::endl;
+    // std::cout
+    // << "yTot.cols() = "
+    // << yTot.cols()
+    // << std::endl;
 
     int validCols = (ctr.segmented.iEnd(0) + 1) * NB_INTEGRATION_NODES;
 
     // VÉRIF DEBUGGING --------------
-    std::cout
-    << "validCols = "
-    << validCols
-    << std::endl;
+    // std::cout
+    // << "validCols = "
+    // << validCols
+    // << std::endl;
 
     // std::cout
     // << "segmented.iEnd = "
@@ -145,37 +145,37 @@ int main(int argc, char** argv)
     std::ofstream file("robot_backbone.txt");
 
     // VÉRIF DEBUGGING --------------
-    std::cout << "\n===== SEGMENTATION =====\n";
+    // std::cout << "\n===== SEGMENTATION =====\n";
 
-    std::cout << "iEnd(0) = "
-            << ctr.segmented.iEnd(0)
-            << std::endl;
+    // std::cout << "iEnd(0) = "
+    //         << ctr.segmented.iEnd(0)
+    //         << std::endl;
     
-    std::cout << "s(iEnd(0)) = "
-          << ctr.segmented.S(ctr.segmented.iEnd(0))
-          << std::endl;
+    // std::cout << "s(iEnd(0)) = "
+    //       << ctr.segmented.S(ctr.segmented.iEnd(0))
+    //       << std::endl;
 
-    std::cout << "iEnd(1) = "
-            << ctr.segmented.iEnd(1)
-            << std::endl;
+    // std::cout << "iEnd(1) = "
+    //         << ctr.segmented.iEnd(1)
+    //         << std::endl;
     
-    std::cout << "s(iEnd(1)) = "
-            << ctr.segmented.S(ctr.segmented.iEnd(1))
-            << std::endl;
+    // std::cout << "s(iEnd(1)) = "
+    //         << ctr.segmented.S(ctr.segmented.iEnd(1))
+    //         << std::endl;
             
-    std::cout << "iEnd(2) = "
-            << ctr.segmented.iEnd(2)
-            << std::endl;
+    // std::cout << "iEnd(2) = "
+    //         << ctr.segmented.iEnd(2)
+    //         << std::endl;
 
-    std::cout << "s(iEnd(2)) = "
-            << ctr.segmented.S(ctr.segmented.iEnd(2))
-            << std::endl;
+    // std::cout << "s(iEnd(2)) = "
+    //         << ctr.segmented.S(ctr.segmented.iEnd(2))
+    //         << std::endl;
 
-    std::cout << "========================\n";
+    // std::cout << "========================\n";
 
-    std::cout << "\n=== SEGMENTS ===\n";
+    // std::cout << "\n=== SEGMENTS ===\n";
 
-    std::cout << "\n=== S ===\n";
+    // std::cout << "\n=== S ===\n";
 
     for(int i = 0; i < ctr.segmented.S.size(); ++i)
     {
