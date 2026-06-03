@@ -60,6 +60,8 @@ class MainApp(QMainWindow):
 
         self.load_trajectory_data()
 
+        self.ghost_robot = None
+
         # Historique de la trajectoire de la pointe
         self.tip_path_x = []
         self.tip_path_y = []
@@ -75,6 +77,8 @@ class MainApp(QMainWindow):
             "z": []
         }
 
+        self.record_orientation_history = False
+
         # --- Mémoriser la dérnière configuration pour l'animation entre 2 positions entrées ---
         self.current_q = [
             -0.30,
@@ -85,10 +89,15 @@ class MainApp(QMainWindow):
             0.0
         ]
 
+        self.last_valid_q = self.current_q.copy()
+
         self.saved_elev = 20
         self.saved_azim = -45
 
         self.compute_ctr_configuration(self.current_q)
+
+        self.set_current_as_home()
+
 
 
     def load_trajectory_data(self):
@@ -173,7 +182,6 @@ class MainApp(QMainWindow):
                         }
                     )
 
-        print(f"[{len(self.steps_data)}] étapes d'animation chargées avec succès.")
 
     def init_ui(self):
 
@@ -289,6 +297,24 @@ class MainApp(QMainWindow):
 
         self.btn_home.clicked.connect(
             self.go_home
+        )
+
+        self.btn_last_valid = QPushButton(
+            "Dernière position valide"
+        )
+
+        self.btn_last_valid.setStyleSheet("""
+            background-color:#FF9800;
+            color:white;
+            font-size:14px;
+        """)
+
+        self.btn_last_valid.clicked.connect(
+            self.go_last_valid
+        )
+
+        animation_layout.addWidget(
+            self.btn_last_valid
         )
 
         animation_layout.addWidget(
@@ -548,6 +574,23 @@ class MainApp(QMainWindow):
             self.btn_apply
         )
 
+
+        # ghost robot
+
+        self.ghost_checkbox = QCheckBox(
+            "Afficher dernière position mémorisé"
+        )
+
+        self.ghost_checkbox.setChecked(False)
+
+        self.ghost_checkbox.toggled.connect(
+            self.update_plots
+        )
+
+        config_layout.addWidget(
+            self.ghost_checkbox
+        )
+
         config_group.setLayout(
             config_layout
         )
@@ -651,12 +694,73 @@ class MainApp(QMainWindow):
             wspace=0.35
         )
 
+
+    def go_last_valid(self):
+
+        for i in range(6):
+            self.q_inputs[i].setValue(
+                self.last_valid_q[i]
+            )
+
+        self.compute_ctr_configuration(
+            self.last_valid_q
+        )
+
+        self.current_q = self.last_valid_q.copy()
+
+        print("Retour à la dernière position valide")
+
+        
     def set_current_as_home(self):
 
         self.home_q = [
             spinbox.value()
             for spinbox in self.q_inputs
         ]
+
+        if self.steps_data:
+
+            step = self.steps_data[self.current_step]
+
+            matrix_data = step["matrix"]
+            iEnd = step["iEnd"]
+            S = step["S"]
+
+            xyz = matrix_data[0:3, :].T
+
+            dxyz = np.diff(xyz, axis=0)
+
+            dl = np.linalg.norm(dxyz, axis=1)
+
+            length_axis = np.concatenate(([0], np.cumsum(dl)))
+
+            s_ext = S[iEnd[2]]
+            s_mid = S[iEnd[1]]
+
+            end_ext = np.argmin(
+                np.abs(length_axis - s_ext)
+            ) + 1
+
+            end_mid = np.argmin(
+                np.abs(length_axis - s_mid)
+            ) + 1
+
+            end_int = matrix_data.shape[1]
+
+            x = matrix_data[0,:].copy()
+            y = matrix_data[1,:].copy()
+            z = matrix_data[2,:].copy()
+
+            self.ghost_robot = {
+                "x": x,
+                "y": y,
+                "z": z,
+                "end_ext": end_ext,
+                "end_mid": end_mid,
+                "end_int": end_int
+            }
+
+
 
         print("Nouvelle position Home :", self.home_q)
 
@@ -826,7 +930,6 @@ class MainApp(QMainWindow):
             print(result.stdout)
 
 
-
             collision = False
             divergence = False
 
@@ -836,19 +939,14 @@ class MainApp(QMainWindow):
 
                 if "clashing" in lower_line:
 
-                    collision = True
                     self.set_status_collision(line)
-                    break
+                    return False
 
                 if "failed to converge" in lower_line:
 
-                    divergence = True
                     self.set_status_divergence(line)
-                    break
+                    return False
 
-
-            if collision or divergence:
-                return
 
             self.set_status_ok()
 
@@ -858,11 +956,15 @@ class MainApp(QMainWindow):
 
             self.update_plots()
 
+            return True
+
         except Exception as e:
 
             print("Erreur :", e)
 
-    def animate_to_configuration(self, target_q): # Creér plusieurs étapes entres 2 positions (can be deleted or edit n_steps = 1)
+    def animate_to_configuration(self, target_q):
+
+        self.record_orientation_history = True
 
         self.tip_orientation_history = {
             "x": [],
@@ -872,27 +974,58 @@ class MainApp(QMainWindow):
 
         n_steps = self.steps_spinbox.value()
 
+        self.status_label.setText(
+            f"Étape : 0 / {n_steps}"
+        )
+
         q_start = np.array(self.current_q)
         q_target = np.array(target_q)
 
-        for alpha in np.linspace(
-            0.0,
-            1.0,
-            n_steps + 1
-        )[1:]:
+        # dernière configuration valide connue
+        last_valid_q = q_start.copy()
+
+        for step_id, alpha in enumerate(
+            np.linspace(0.0, 1.0, n_steps + 1)[1:],
+            start=1
+        ):
 
             q_interp = (
-                (1 - alpha) * q_start + alpha * q_target
+                (1 - alpha) * q_start +
+                alpha * q_target
             )
 
-            self.compute_ctr_configuration(
+            self.status_label.setText(
+                f"Étape : {step_id} / {n_steps}"
+            )
+
+            success = self.compute_ctr_configuration(
                 q_interp.tolist()
             )
 
+            # HEREEEEE
+
             QApplication.processEvents()
+
+            if not success:
+
+                self.status_label.setText(
+                    f"❌ Crash à l'étape {step_id}/{n_steps}"
+                )
+
+                self.current_q = list(last_valid_q)
+
+                return
+
+            last_valid_q = q_interp.copy()
+            self.last_valid_q = q_interp.copy()
+
+        self.status_label.setText(
+            f"✅ Terminé : {n_steps}/{n_steps}"
+        )
 
         self.current_q = list(target_q)
 
+        self.record_orientation_history = False
 
     def on_view_changed(self, event):
 
@@ -959,7 +1092,7 @@ class MainApp(QMainWindow):
         self.ax_robot.view_init(elev=current_elev, azim=current_azim)
 
 
-        # --- A. RENDU DU ROBOT 3D OPTIMIZED---
+        # RENDU DU ROBOT 3D OPTIMIZED
 
         scale = 1000
 
@@ -1010,7 +1143,7 @@ class MainApp(QMainWindow):
                 '--',
                 linewidth=2,
                 color='dodgerblue',
-                alpha=0.8,
+                alpha=0.6,
                 label="Tip path"
             )
 
@@ -1051,11 +1184,27 @@ class MainApp(QMainWindow):
         tip_angle_z = np.degrees(
             np.arccos(np.clip(t_z, -1.0, 1.0))
         )
+    
 
-        # Stock historiques XYZ de la pointe pour graphique
-        self.tip_orientation_history["x"].append(tip_angle_x)
-        self.tip_orientation_history["y"].append(tip_angle_y)
-        self.tip_orientation_history["z"].append(tip_angle_z)
+
+        if len(self.tip_orientation_history["x"]) == 0:
+
+            self.tip_orientation_history["x"].append(tip_angle_x)
+            self.tip_orientation_history["y"].append(tip_angle_y)
+            self.tip_orientation_history["z"].append(tip_angle_z)
+
+        else:
+
+            if (
+                abs(self.tip_orientation_history["x"][-1] - tip_angle_x) > 1e-6
+                or abs(self.tip_orientation_history["y"][-1] - tip_angle_y) > 1e-6
+                or abs(self.tip_orientation_history["z"][-1] - tip_angle_z) > 1e-6
+            ):
+
+                self.tip_orientation_history["x"].append(tip_angle_x)
+                self.tip_orientation_history["y"].append(tip_angle_y)
+                self.tip_orientation_history["z"].append(tip_angle_z)
+
 
         # Axes du repère
         axis_len = 0.03
@@ -1078,7 +1227,62 @@ class MainApp(QMainWindow):
             color='b'
         )
 
-        # AFFICHAGE 3d CTR
+        # ========= FANTÔME =========
+
+        print("ghost =", self.ghost_robot)
+
+        if (
+            self.ghost_robot is not None
+            and self.ghost_checkbox.isChecked()
+        ):
+
+            gx = self.ghost_robot["x"]
+            gy = self.ghost_robot["y"]
+            gz = self.ghost_robot["z"]
+
+            g_ext = self.ghost_robot["end_ext"]
+            g_mid = self.ghost_robot["end_mid"]
+            g_int = self.ghost_robot["end_int"]
+
+            print("DRAWING GHOST")
+
+            print("Ghost first point:", gx[0], gy[0], gz[0])
+            print("Current first point:", x[0], y[0], z[0])
+
+            print("Ghost last point:", gx[-1], gy[-1], gz[-1])
+            print("Current last point:", x[-1], y[-1], z[-1])
+
+            print("Fantôme enregistré")
+            print("Tip fantôme :", x[-1], y[-1], z[-1])
+
+            self.ax_robot.plot(
+                gx[:g_ext],
+                gy[:g_ext],
+                gz[:g_ext],
+                color='cyan',
+                alpha=0.25,
+                linewidth=(2*self.r_tube[0])*scale
+            )
+
+            self.ax_robot.plot(
+                gx[g_ext-1:g_mid],
+                gy[g_ext-1:g_mid],
+                gz[g_ext-1:g_mid],
+                color='cyan',
+                alpha=0.25,
+                linewidth=(2*self.r_tube[1])*scale
+            )
+
+            self.ax_robot.plot(
+                gx[g_mid-1:g_int],
+                gy[g_mid-1:g_int],
+                gz[g_mid-1:g_int],
+                color='cyan',
+                alpha=0.25,
+                linewidth=(2*self.r_tube[2])*scale
+            )
+
+        # AFFICHAGE 3D CTR
         self.ax_robot.set_title("Modélisation CTR en 3D")
 
         # 1. Calcul des limites dynamiques basées sur la géométrie réelle du robot
@@ -1095,7 +1299,7 @@ class MainApp(QMainWindow):
         # 3. Forcer le ratio 1:1:1 pour éviter les déformations visuelles du robot
         self.ax_robot.set_box_aspect((1, 1, 1))
 
-        # --- B. GRAPHES ---
+        # GRAPHES
         selected_graph = self.graph_selector.currentIndex()
 
         if selected_graph == 0:
@@ -1122,27 +1326,28 @@ class MainApp(QMainWindow):
         elif selected_graph == 1:
 
             steps = np.arange(
-                len(self.tip_orientation_history["x"])
+                1,
+                len(self.tip_orientation_history["x"]) + 1
             )
 
             self.ax_plots.plot(
                 steps,
                 self.tip_orientation_history["x"],
-                'r-',
+                'ro-',
                 label="Tip / X"
             )
 
             self.ax_plots.plot(
                 steps,
                 self.tip_orientation_history["y"],
-                'g-',
+                'go-',
                 label="Tip / Y"
             )
 
             self.ax_plots.plot(
                 steps,
                 self.tip_orientation_history["z"],
-                'b-',
+                'bo-',
                 label="Tip / Z"
             )
 
