@@ -1,27 +1,24 @@
 import sys
 import os
 import numpy as np
-import time
 import subprocess
-
-from PyQt5.QtWidgets import QCheckBox, QDoubleSpinBox, QSpinBox, QFileDialog, QMessageBox
-from PyQt5.QtCore import QLocale
-
-
-# Gestion des imports PyQt5 et Matplotlib
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox
-from PyQt5.QtCore import QTimer, Qt
+ 
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget,
+    QVBoxLayout, QHBoxLayout, QGridLayout,
+    QPushButton, QLabel, QComboBox,
+    QCheckBox, QDoubleSpinBox, QSpinBox,
+    QFileDialog, QMessageBox,
+    QGroupBox, QScrollArea
+)
+from PyQt5.QtCore import Qt, QLocale
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PyQt5.QtWidgets import (
-    QGroupBox,
-    QGridLayout,
-    QScrollArea
-)
-from matplotlib.ticker import MultipleLocator
-
 from scipy.spatial.transform import Rotation as Rot
+ 
+from ctr_data import CTRData
 
+from ctr_visualizer import CTRVisualizer
 
 # --- GESTION DU REPERTOIRE DE PYTHON (Dossier frère) ---
 current_dir = os.path.dirname(os.path.abspath(__file__)) # ~/CRVisToolkit/gui
@@ -78,6 +75,16 @@ class MainApp(QMainWindow):
             "y": [],
             "z": []
         }
+
+        self.home_q = [
+            -0.30,
+            -0.20,
+            -0.10,
+            0.0,
+            0.0,
+            0.0
+        ]
+        
 
         self.record_orientation_history = False
 
@@ -150,31 +157,12 @@ class MainApp(QMainWindow):
 
                 if len(data_lines) == 19:
 
-                    lengths = [
-                        len(line.split())
-                        for line in data_lines
-                    ]
-
-                    # print("Nombre de colonnes par ligne :", lengths)
-
                     matrix_lines = [
                         list(map(float, line.split()))
                         for line in data_lines
                     ]
 
                     arr = np.array(matrix_lines)
-
-                    # print("Shape chargée :", arr.shape)
-
-                    z = arr[2,:]
-
-                    # print(
-                    #     "z range :",
-                    #     np.min(z),
-                    #     "->",
-                    #     np.max(z)
-                    # )
-
 
                     self.steps_data.append(
                         {
@@ -183,6 +171,11 @@ class MainApp(QMainWindow):
                             "S": S
                         }
                     )
+
+
+
+
+
 
 
     def init_ui(self):
@@ -495,16 +488,6 @@ class MainApp(QMainWindow):
             actuators_group
         )
 
-        self.home_q = [
-            -0.30,
-            -0.20,
-            -0.10,
-            0.0,
-            0.0,
-            0.0
-        ]
-        
-
         # ==========================================================
         # CONFIGURATION
         # ==========================================================
@@ -576,7 +559,6 @@ class MainApp(QMainWindow):
 
 
         # ghost robot
-
         self.ghost_checkbox = QCheckBox(
             "Afficher dernière position mémorisé"
         )
@@ -590,24 +572,6 @@ class MainApp(QMainWindow):
         config_layout.addWidget(
             self.ghost_checkbox
         )
-
-
-        # Affichage des Chariots
-        self.show_carriages_checkbox = QCheckBox(
-            "Afficher les chariots"
-        )
-
-        self.show_carriages_checkbox.setChecked(False)
-
-        self.show_carriages_checkbox.toggled.connect(
-            self.update_plots
-        )
-
-        config_layout.addWidget(
-            self.show_carriages_checkbox
-        )
-
-
 
         config_group.setLayout(
             config_layout
@@ -696,6 +660,10 @@ class MainApp(QMainWindow):
             122
         )
 
+        self.visualizer = CTRVisualizer(
+            self.ax_robot
+        )
+
         self.ax_robot.view_init(
             elev=20,
             azim=-45
@@ -716,7 +684,7 @@ class MainApp(QMainWindow):
     # Gestion de la correction telescopique
 
     def enforce_telescopic_constraints(self,q,active):
-        print("CONSTRAINT FUNCTION CALLED")
+
         # Longueurs tubes
         l1 = 0.463
         l2 = 0.3305
@@ -737,9 +705,6 @@ class MainApp(QMainWindow):
         eps = 0.005
 
         q = list(q)
-
-        print("ACTIVE =", active)
-        print("INPUT =", q)
 
         # -------------------
         # Tube 1 déplacé
@@ -799,13 +764,6 @@ class MainApp(QMainWindow):
             q[2] = q[1] + (l2 - l3) - eps
 
             tip3 = l3 + q[2]
-
-        print("tip1 =", tip1)
-        print("tip2 =", tip2)
-        print("tip3 =", tip3)
-
-        print("OUTPUT =", q)
-        print("TIPS =",[tip1, tip2, tip3])
 
         return q
 
@@ -882,10 +840,6 @@ class MainApp(QMainWindow):
                 "end_int": end_int
             }
 
-
-
-        # print("Nouvelle position Home :", self.home_q)
-
     def go_home(self):
 
         self.tip_path_x.clear()
@@ -927,22 +881,6 @@ class MainApp(QMainWindow):
 
     def apply_configuration(self):
 
-        print("APPLY CALLED")
-
-        print("========== APPLY ==========")
-
-        print(
-            "Spinboxes =",
-            [self.q_inputs[i].value() for i in range(6)]
-        )
-
-        print(
-            "active_actuator =",
-            getattr(self, "active_actuator", None)
-        )
-
-        ####
-
         q_values = [ # Permet la génération de plusieurs positions intermédiaire
             self.q_inputs[i].value()
             for i in range(6)
@@ -953,8 +891,6 @@ class MainApp(QMainWindow):
                 "active_actuator",
                 0
         )
-
-        print("Avant correction :", q_values)
         
         q_values = self.enforce_telescopic_constraints(
             q_values,
@@ -965,8 +901,6 @@ class MainApp(QMainWindow):
             self.q_inputs[i].blockSignals(True)
             self.q_inputs[i].setValue(q_values[i])
             self.q_inputs[i].blockSignals(False)
-
-        print("Après correction :", q_values)
 
         self.animate_to_configuration(
             q_values
@@ -1036,8 +970,6 @@ class MainApp(QMainWindow):
     
     def save_plot(self):
 
-        options = QFileDialog.Options()
-
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Sauvegarder la fenêtre",
@@ -1100,20 +1032,6 @@ class MainApp(QMainWindow):
                 "build"
             )
 
-            # --- debugging ---
-            print(
-                "beta1 beta2 beta3 =",
-                q_values[0],
-                q_values[1],
-                q_values[2]
-            )
-
-            print(
-                repr(q_values[0]),
-                repr(q_values[1]),
-                repr(q_values[2])
-            )
-
             # Appel du solveur
             result = subprocess.run(
                 cmd,
@@ -1123,10 +1041,6 @@ class MainApp(QMainWindow):
             )
 
             print(result.stdout)
-
-
-            collision = False
-            divergence = False
 
             for line in result.stdout.splitlines():
 
@@ -1197,8 +1111,6 @@ class MainApp(QMainWindow):
                 q_interp.tolist()
             )
 
-            # HEREEEEE
-
             QApplication.processEvents()
 
             if not success:
@@ -1230,7 +1142,7 @@ class MainApp(QMainWindow):
 
 
     def update_plots(self):
-        t0 = time.perf_counter()
+
         if not self.steps_data or self.current_step >= len(self.steps_data):
             return
         
@@ -1240,45 +1152,38 @@ class MainApp(QMainWindow):
         # Récupération de la matrice (19, N) pré-filtrée
         step = self.steps_data[self.current_step]
 
-        matrix_data = step["matrix"]
-        iEnd = step["iEnd"]
-        S = step["S"]
+        data = CTRData(
+            step["matrix"],
+            step["iEnd"],
+            step["S"]
+        )
 
-        num_nodes = matrix_data.shape[1]
+        matrix_data = data.matrix_data
 
-        xyz = matrix_data[0:3, :]
+        x = data.x
+        y = data.y
+        z = data.z
 
-        x = xyz[0]
-        y = xyz[1]
-        z = xyz[2]
+        length_axis = data.length_axis
 
-        # Calcul de la longueur curviligne réelle
-        xyz = matrix_data[0:3, :].T
+        end_ext = data.end_ext
+        end_mid = data.end_mid
+        end_int = data.end_int
 
-        dxyz = np.diff(xyz, axis=0)
+        num_nodes = data.num_nodes
 
-        dl = np.linalg.norm(dxyz, axis=1)
+        R_tip = data.R_tip
 
-        length_axis = np.concatenate(([0], np.cumsum(dl)))
+        tip_x = data.tip_x
+        tip_y = data.tip_y
+        tip_z = data.tip_z
 
+        tip_angle_x = data.tip_angle_x
+        tip_angle_y = data.tip_angle_y
+        tip_angle_z = data.tip_angle_z
 
-        # Longueurs physiques des extrémités
-
-        s_ext = S[iEnd[2]]
-        s_mid = S[iEnd[1]]
-
-        # Indices réels correspondants dans le backbone
-
-        end_ext = np.argmin(
-            np.abs(length_axis - s_ext)
-        ) + 1
-
-        end_mid = np.argmin(
-            np.abs(length_axis - s_mid)
-        ) + 1
-
-        end_int = num_nodes
-
+        theta_2 = data.theta_2
+        theta_3 = data.theta_3
 
         # Tentative debugging affichage
 
@@ -1348,10 +1253,6 @@ class MainApp(QMainWindow):
         # Calcul de l'orientation pointe
         R_tip = matrix_data[3:12, -1].reshape((3, 3), order='C')
 
-        t_x = R_tip[0, 2]
-        t_y = R_tip[1, 2]
-        t_z = R_tip[2, 2]
-
         tip_x = matrix_data[0, -1]
         tip_y = matrix_data[1, -1]
         tip_z = matrix_data[2, -1]
@@ -1373,12 +1274,6 @@ class MainApp(QMainWindow):
 
 
         rotation = Rot.from_matrix(R_tip)
-
-
-        # print(rotation.as_euler('xyz', degrees=True))
-
-        # print("R_tip =")
-        # print(R_tip)
 
         tip_angle_x, tip_angle_y, tip_angle_z = rotation.as_euler(
             'xyz',
@@ -1432,10 +1327,6 @@ class MainApp(QMainWindow):
 
         axis_len_tip = 0.02
 
-        x_axis = R_tip[:, 0]
-        y_axis = R_tip[:, 1]
-        z_axis = R_tip[:, 2]
-
         # Axe X local
         self.ax_robot.quiver(
             tip_x, tip_y, tip_z,
@@ -1468,8 +1359,6 @@ class MainApp(QMainWindow):
 
 
         # ========= FANTÔME =========
-
-        # print("ghost =", self.ghost_robot)
 
         if (
             self.ghost_robot is not None
@@ -1510,40 +1399,6 @@ class MainApp(QMainWindow):
                 alpha=0.25,
                 linewidth=(2*self.r_tube[2])*scale
             )
-
-
-        # ========= RENDU DES CHARIOTS (ACTIONNEURS LOGICIELS) =========
-        if self.show_carriages_checkbox.isChecked():
-            # Position fixe en X et Y pour la glissière linéaire (alignée sur l'axe Z)
-            carriage_x = 0
-            carriage_y = 0
-            
-            # Représentation des 3 chariots par des gros marqueurs carrés distincts
-            # Tube 1 (Interne)
-            self.ax_robot.scatter(
-                carriage_x, carriage_y, q_current[0],
-                color='lightgray', marker='s', s=250, edgecolors='black', 
-                label='Carriage 1 (Int)'
-            )
-            # Tube 2 (Intermédiaire)
-            self.ax_robot.scatter(
-                carriage_x, carriage_y, q_current[1],
-                color='dimgray', marker='s', s=350, edgecolors='black',
-                label='Carriage 2 (Mid)'
-            )
-            # Tube 3 (Externe)
-            self.ax_robot.scatter(
-                carriage_x, carriage_y, q_current[2],
-                color='black', marker='s', s=450, edgecolors='black',
-                label='Carriage 3 (Ext)'
-            )
-            
-            # Dessin de la glissière / axe de guidage en arrière-plan
-            self.ax_robot.plot(
-                [0, 0], [0, 0], [-0.40, 0.05],
-                color='blue', linestyle=':', linewidth=1.5, alpha=0.5
-            )
-
 
 
         # AFFICHAGE 3D CTR
@@ -1635,11 +1490,6 @@ class MainApp(QMainWindow):
             theta_2 = matrix_data[17, :]
             theta_3 = matrix_data[18, :]
 
-            # fin des theta 2 et 3
-            # theta_2end = theta_2[-1]
-            # theta_3end = theta_3[-1]
-
-
             t2_display = np.copy(theta_2)
             t3_display = np.copy(theta_3)
 
@@ -1701,17 +1551,6 @@ class MainApp(QMainWindow):
                 max_y + margin
             )
 
-            # #DEBUGGING VERIF
-            # print("----------------")
-            # print(f"np.min(theta_2) = {np.min(theta_2)} \n np.max(theta_2) = {np.max(theta_2)} \n")
-            # print(f"np.min(theta_3) = {np.min(theta_3)} \n np.max(theta_3) = {np.max(theta_3)} \n")
-            # print(f"theta_2[:10] = {theta_2[:10]} \n theta_2[-10:] = {theta_2[-10:]} \n")
-            # print(f"theta_3[:10] = {theta_3[:10]} \n theta_3[-10:] = {theta_3[-10:]} \n")
-            # print("theta_2(end) =", theta_2[-1])
-            # print("theta_3(end) =", theta_3[-1])
-            # # print(f"u_z = {matrix_data[16,:]} \n")
-            # print("----------------")
-
             self.ax_plots.scatter(
                 length_axis[end_mid-1],
                 theta_2[end_mid-1],
@@ -1749,7 +1588,6 @@ class MainApp(QMainWindow):
             )
 
 
-
         # --- CORRECTION DES QUADRILLAGES ---
         self.ax_plots.grid(True, linestyle=':', alpha=0.6, zorder=2)
 
@@ -1776,14 +1614,9 @@ class MainApp(QMainWindow):
                 framealpha=0.9
             )
 
-        self.fig.subplots_adjust(left=0.05, right=0.95, wspace=0.35)
-        t1 = time.perf_counter()
-        print("total :", round((t1 - t0) * 1000, 1), "ms")
-        print("----------------")
-
         # Mise à jour du panneau
         self.tip_info_label.setText(
-            f"Tip:\n"
+            f"Organe terminal:\n"
             f"x = {tip_x*1000:.1f} mm\n"
             f"y = {tip_y*1000:.1f} mm\n"
             f"z = {tip_z*1000:.1f} mm\n\n"
@@ -1793,8 +1626,6 @@ class MainApp(QMainWindow):
             f"Z = {tip_angle_z:.1f}°"
         )
         self.canvas.draw_idle()
-        # print(matrix_data[3:12,0])
-        # print(matrix_data[3:12,-1])
 
 
 if __name__ == "__main__":
