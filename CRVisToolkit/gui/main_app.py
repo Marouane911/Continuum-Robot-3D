@@ -20,6 +20,8 @@ from ctr_data import CTRData
 
 from ctr_visualizer import CTRVisualizer
 
+
+
 # --- GESTION DU REPERTOIRE DE PYTHON (Dossier frère) ---
 current_dir = os.path.dirname(os.path.abspath(__file__)) # ~/CRVisToolkit/gui
 root_toolkit = os.path.dirname(current_dir)              # ~/CRVisToolkit
@@ -68,6 +70,10 @@ class MainApp(QMainWindow):
 
         # --- Initialisation de l'interface GUI ---
         self.init_ui()
+
+        self.visualizer = CTRVisualizer(
+            self.ax_robot
+        )
 
         # Historique orientation pointe
         self.tip_orientation_history = {
@@ -660,10 +666,6 @@ class MainApp(QMainWindow):
             122
         )
 
-        self.visualizer = CTRVisualizer(
-            self.ax_robot
-        )
-
         self.ax_robot.view_init(
             elev=20,
             azim=-45
@@ -1195,43 +1197,16 @@ class MainApp(QMainWindow):
         self.ax_robot.view_init(elev=current_elev, azim=current_azim)
 
 
-        # RENDU DU ROBOT 3D OPTIMIZED
+        # RENDU DU ROBOT 3D
 
-        scale = 1000
-
-        # Tube externe
-        self.ax_robot.plot(
-            x[:end_ext],
-            y[:end_ext],
-            z[:end_ext],
-            linewidth= (2*self.r_tube[0]) * scale,
-            color='black'
-        )
-
-        # Tube intermédiaire
-        self.ax_robot.plot(
-            x[end_ext - 1 : end_mid],
-            y[end_ext - 1 : end_mid],
-            z[end_ext - 1 : end_mid],
-            linewidth=(2*self.r_tube[1]) * scale,
-            color='dimgray'
-        )
-
-        # Tube interne
-        self.ax_robot.plot(
-            x[end_mid - 1 : end_int],
-            y[end_mid - 1 : end_int],
-            z[end_mid - 1 : end_int],
-            linewidth= (2*self.r_tube[2]) * scale,
-            color='lightgray'
-        )
-
-        # Pointe
-        self.ax_robot.scatter(
-            x[-1],
-            y[-1],
-            z[-1],
-            s=40
+        self.visualizer.draw_robot(
+            x,
+            y,
+            z,
+            end_ext,
+            end_mid,
+            end_int,
+            self.r_tube
         )
 
         # Trajectoire historique de la pointe
