@@ -118,3 +118,49 @@ class CTRVisualizer:
             0, 0, axis_len,
             color="b"
         )
+
+    def draw_ghost(
+        self,
+        ghost_robot,
+        r_tube
+    ):
+
+        if ghost_robot is None:
+            return
+
+        scale = 1000
+
+        gx = ghost_robot["x"]
+        gy = ghost_robot["y"]
+        gz = ghost_robot["z"]
+
+        g_ext = ghost_robot["end_ext"]
+        g_mid = ghost_robot["end_mid"]
+        g_int = ghost_robot["end_int"]
+
+        self.ax_robot.plot(
+            gx[:g_ext],
+            gy[:g_ext],
+            gz[:g_ext],
+            color="cyan",
+            alpha=0.25,
+            linewidth=(2 * r_tube[0]) * scale
+        )
+
+        self.ax_robot.plot(
+            gx[g_ext - 1:g_mid],
+            gy[g_ext - 1:g_mid],
+            gz[g_ext - 1:g_mid],
+            color="cyan",
+            alpha=0.25,
+            linewidth=(2 * r_tube[1]) * scale
+        )
+
+        self.ax_robot.plot(
+            gx[g_mid - 1:g_int],
+            gy[g_mid - 1:g_int],
+            gz[g_mid - 1:g_int],
+            color="cyan",
+            alpha=0.25,
+            linewidth=(2 * r_tube[2]) * scale
+        )

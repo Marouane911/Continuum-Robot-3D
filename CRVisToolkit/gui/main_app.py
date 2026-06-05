@@ -20,6 +20,8 @@ from ctr_data import CTRData
 
 from ctr_visualizer import CTRVisualizer
 
+from ctr_graph import CTRGraphs
+
 
 
 # --- GESTION DU REPERTOIRE DE PYTHON (Dossier frère) ---
@@ -666,6 +668,11 @@ class MainApp(QMainWindow):
             122
         )
 
+        self.graphs = CTRGraphs(
+            self.ax_plots,
+            self.l_kappa
+        )
+
         self.ax_robot.view_init(
             elev=20,
             azim=-45
@@ -1292,46 +1299,12 @@ class MainApp(QMainWindow):
 
         # ========= FANTÔME =========
 
-        if (
-            self.ghost_robot is not None
-            and self.ghost_checkbox.isChecked()
-        ):
+        if self.ghost_checkbox.isChecked():
 
-            gx = self.ghost_robot["x"]
-            gy = self.ghost_robot["y"]
-            gz = self.ghost_robot["z"]
-
-            g_ext = self.ghost_robot["end_ext"]
-            g_mid = self.ghost_robot["end_mid"]
-            g_int = self.ghost_robot["end_int"]
-
-            self.ax_robot.plot(
-                gx[:g_ext],
-                gy[:g_ext],
-                gz[:g_ext],
-                color='cyan',
-                alpha=0.25,
-                linewidth=(2*self.r_tube[0])*scale
+            self.visualizer.draw_ghost(
+                self.ghost_robot,
+                self.r_tube
             )
-
-            self.ax_robot.plot(
-                gx[g_ext-1:g_mid],
-                gy[g_ext-1:g_mid],
-                gz[g_ext-1:g_mid],
-                color='cyan',
-                alpha=0.25,
-                linewidth=(2*self.r_tube[1])*scale
-            )
-
-            self.ax_robot.plot(
-                gx[g_mid-1:g_int],
-                gy[g_mid-1:g_int],
-                gz[g_mid-1:g_int],
-                color='cyan',
-                alpha=0.25,
-                linewidth=(2*self.r_tube[2])*scale
-            )
-
 
         # AFFICHAGE 3D CTR
         self.ax_robot.set_title("Modélisation CTR en 3D")
@@ -1374,44 +1347,11 @@ class MainApp(QMainWindow):
             self.ax_plots.set_ylabel("Angle de référence (degrés)", labelpad=12)
             self.ax_plots.set_ylim([0, 120])
 
+        
         elif selected_graph == 1:
 
-            steps = np.arange(
-                1,
-                len(self.tip_orientation_history["x"]) + 1
-            )
-
-            self.ax_plots.plot(
-                steps,
-                self.tip_orientation_history["x"],
-                'ro-',
-                label="Tip / X"
-            )
-
-            self.ax_plots.plot(
-                steps,
-                self.tip_orientation_history["y"],
-                'go-',
-                label="Tip / Y"
-            )
-
-            self.ax_plots.plot(
-                steps,
-                self.tip_orientation_history["z"],
-                'bo-',
-                label="Tip / Z"
-            )
-
-            self.ax_plots.set_title(
-                "Tip orientation during motion"
-            )
-
-            self.ax_plots.set_xlabel(
-                "Motion step"
-            )
-
-            self.ax_plots.set_ylabel(
-                "Angle (deg)"
+            self.graphs.plot_tip_orientation_history(
+                self.tip_orientation_history
             )
 
 
