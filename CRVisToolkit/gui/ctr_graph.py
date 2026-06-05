@@ -127,3 +127,107 @@ class CTRGraphs:
         )
 
         self.ax_plots.set_ylim([0, 120])
+
+    def plot_twist_distribution(
+        self,
+        data
+    ):
+    
+        # Torsion relative
+        theta_2 = data.theta_2
+        theta_3 = data.theta_3
+
+        t2_display = np.copy(theta_2)
+        t3_display = np.copy(theta_3)
+
+        t3_display[data.end_ext:] = np.nan
+        t2_display[data.end_mid:] = np.nan
+
+        self.ax_plots.plot(data.length_axis, t2_display, 'b-', markersize=2, label=r"$\theta_2(s)$")
+        self.ax_plots.plot(data.length_axis, t3_display, 'r-', markersize=2, label=r"$\theta_3(s)$")
+
+        l_transition1 = data.length_axis[data.end_ext - 1]
+        l_transition2 = data.length_axis[data.end_mid - 1]
+
+        self.ax_plots.axvline(x=l_transition1, color='orange', linestyle='--', alpha=0.7, label="End T3 (Ext)")
+        self.ax_plots.axvline(x=l_transition2, color='purple', linestyle='--', alpha=0.7, label="End T2 (Mid)")
+
+        # Zones de précourbure
+        start_curve_t3 = l_transition1 - self.l_kappa
+        if start_curve_t3 > 0:
+            self.ax_plots.axvline(x=start_curve_t3,color='darkorange', linestyle=':', linewidth=2.5, label=r"Start curve T3")
+            self.ax_plots.axvspan(start_curve_t3, l_transition1, color='orange', alpha=0.07, zorder=1)
+
+        start_curve_t2 = l_transition2 - self.l_kappa
+        if start_curve_t2 > 0:
+            self.ax_plots.axvline(x=start_curve_t2, color='purple', linestyle=':', linewidth=2.5, label=r"Start curve T2")
+            self.ax_plots.axvspan(start_curve_t2, l_transition2, color='purple', alpha=0.04, zorder=1)
+
+        l_end_t1 = data.length_axis[-1]
+        start_curve_t1 = l_end_t1 - self.l_kappa
+        if start_curve_t1 > 0:
+            self.ax_plots.axvline(x=start_curve_t1, color='green', linestyle=':', linewidth=2.5,
+                                    label=r"Start curve T1 (Int)")
+            self.ax_plots.axvspan(start_curve_t1, l_end_t1, color='green', alpha=0.03, zorder=1)
+            # Ligne de fin désormais visible grâce à la marge de 5%
+            self.ax_plots.axvline(x=l_end_t1, color='green', linestyle='--', alpha=0.7, label="End T1 (Tip)")
+
+
+        self.ax_plots.set_title("Angles de torsion des tubes le long du CTR", fontsize=11, fontweight='bold')
+        self.ax_plots.set_ylabel("Twist angle (rad)", labelpad=10)
+
+        # Limites dynamiques
+        min_y = np.nanmin([t2_display, t3_display])
+        max_y = np.nanmax([t2_display, t3_display])
+
+        self.ax_plots.set_ylim(
+            min_y - 0.05,
+            max_y + 0.05
+        )
+
+        # Préviens le cas où les torsions sont petites
+        margin = 0.1 * (max_y - min_y)
+
+        if margin < 1e-3:
+            margin = 1e-3
+
+        self.ax_plots.set_ylim(
+            min_y - margin,
+            max_y + margin
+        )
+
+        self.ax_plots.scatter(
+            data.length_axis[data.end_mid-1],
+            theta_2[data.end_mid-1],
+            color='blue',
+            s=40
+        )
+
+        self.ax_plots.scatter(
+            data.length_axis[data.end_ext-1],
+            theta_3[data.end_ext-1],
+            color='red',
+            s=40
+        )
+
+        self.ax_plots.annotate(
+            f"{theta_2[data.end_mid-1]:.4f} rad",
+            (
+                data.length_axis[data.end_mid-1],
+                theta_2[data.end_mid-1]
+            ),
+            xytext=(10,-15),
+            textcoords="offset points",
+            color="blue"
+        )
+
+        self.ax_plots.annotate(
+            f"{theta_3[data.end_ext-1]:.4f} rad",
+            (
+                data.length_axis[data.end_ext-1],
+                theta_3[data.end_ext-1]
+            ),
+            xytext=(10,-15),
+            textcoords="offset points",
+            color="red"
+        )
