@@ -1277,26 +1277,8 @@ class MainApp(QMainWindow):
 
 
         # Axes du repère
-        axis_len = 0.03
 
-
-        self.ax_robot.quiver(
-            0, 0, 0,
-            axis_len, 0, 0,
-            color='r'
-        )
-
-        self.ax_robot.quiver(
-            0, 0, 0,
-            0, axis_len, 0,
-            color='g'
-        )
-
-        self.ax_robot.quiver(
-            0, 0, 0,
-            0, 0, axis_len,
-            color='b'
-        )
+        self.visualizer.draw_world_frame()
 
         # Axes du repère de l'organe terminal
 
