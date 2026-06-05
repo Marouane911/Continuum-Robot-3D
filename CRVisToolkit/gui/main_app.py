@@ -20,6 +20,8 @@ from PyQt5.QtWidgets import (
 )
 from matplotlib.ticker import MultipleLocator
 
+from scipy.spatial.transform import Rotation as Rot
+
 
 # --- GESTION DU REPERTOIRE DE PYTHON (Dossier frère) ---
 current_dir = os.path.dirname(os.path.abspath(__file__)) # ~/CRVisToolkit/gui
@@ -184,6 +186,7 @@ class MainApp(QMainWindow):
 
 
     def init_ui(self):
+
 
         self.setStyleSheet("""
             QMainWindow {
@@ -353,11 +356,11 @@ class MainApp(QMainWindow):
         )
 
         self.tip_info_label = QLabel(
-            "Tip:\n"
+            "Organe terminal:\n"
             "x = --- mm\n"
             "y = --- mm\n"
             "z = --- mm\n\n"
-            "Orientation:\n"
+            "Orientation terminale:\n"
             "X = ---°\n"
             "Y = ---°\n"
             "Z = ---°"
@@ -470,7 +473,8 @@ class MainApp(QMainWindow):
             )
 
             spinbox.valueChanged.connect(
-                self.on_spinbox_changed
+                lambda _, idx=i:
+                self.on_spinbox_changed(idx)
             )
 
             self.q_inputs.append(
@@ -499,6 +503,7 @@ class MainApp(QMainWindow):
             0.0,
             0.0
         ]
+        
 
         # ==========================================================
         # CONFIGURATION
@@ -533,11 +538,6 @@ class MainApp(QMainWindow):
         )
 
         config_layout.addWidget(
-            self.tip_path_checkbox
-        )
-
-
-        config_layout.addWidget(
             QLabel("Nombre d'étapes")
         )
 
@@ -549,7 +549,7 @@ class MainApp(QMainWindow):
         )
 
         self.steps_spinbox.setValue(
-            25
+            2
         )
 
         config_layout.addWidget(
@@ -590,6 +590,24 @@ class MainApp(QMainWindow):
         config_layout.addWidget(
             self.ghost_checkbox
         )
+
+
+        # Affichage des Chariots
+        self.show_carriages_checkbox = QCheckBox(
+            "Afficher les chariots"
+        )
+
+        self.show_carriages_checkbox.setChecked(False)
+
+        self.show_carriages_checkbox.toggled.connect(
+            self.update_plots
+        )
+
+        config_layout.addWidget(
+            self.show_carriages_checkbox
+        )
+
+
 
         config_group.setLayout(
             config_layout
@@ -695,12 +713,116 @@ class MainApp(QMainWindow):
         )
 
 
+    # Gestion de la correction telescopique
+
+    def enforce_telescopic_constraints(self,q,active):
+        print("CONSTRAINT FUNCTION CALLED")
+        # Longueurs tubes
+        l1 = 0.463
+        l2 = 0.3305
+        l3 = 0.199
+
+        ### Convention générale pour toutes les positions
+        
+        # Tube 1 = interne
+        # Tube 2 = intermédiaire
+        # Tube 3 = externe
+        
+        # beta1 < beta2 < beta3
+        
+        # tip1 > tip2 > tip3
+        
+        ###
+
+        eps = 0.005
+
+        q = list(q)
+
+        print("ACTIVE =", active)
+        print("INPUT =", q)
+
+        # -------------------
+        # Tube 1 déplacé
+        # -------------------
+
+        if active == 0:
+
+            if q[1] < q[0] + eps:
+                q[1] = q[0] + eps
+
+            if q[2] < q[1] + eps:
+                q[2] = q[1] + eps
+
+        # -------------------
+        # Tube 2 déplacé
+        # -------------------
+
+        elif active == 1:
+
+            if q[1] < q[0] + eps:
+                q[1] = q[0] + eps
+
+            if q[2] < q[1] + eps:
+                q[2] = q[1] + eps
+
+        # -------------------
+        # Tube 3 déplacé
+        # -------------------
+
+        elif active == 2:
+
+            if q[2] < q[1] + eps:
+                q[2] = q[1] + eps
+        
+
+        # Calcul des positions des pointes
+        tip1 = l1 + q[0]
+        tip2 = l2 + q[1]
+        tip3 = l3 + q[2]
+
+        # -------------------
+        # Collision distale tube 1 / tube 2
+        # -------------------
+
+        if tip1 <= tip2 + eps:
+
+            q[1] = q[0] + (l1 - l2) - eps
+
+            tip2 = l2 + q[1]
+
+        # -------------------
+        # Collision distale tube 2 / tube 3
+        # -------------------
+
+        if tip2 <= tip3 + eps:
+
+            q[2] = q[1] + (l2 - l3) - eps
+
+            tip3 = l3 + q[2]
+
+        print("tip1 =", tip1)
+        print("tip2 =", tip2)
+        print("tip3 =", tip3)
+
+        print("OUTPUT =", q)
+        print("TIPS =",[tip1, tip2, tip3])
+
+        return q
+
+
+
+
     def go_last_valid(self):
 
         for i in range(6):
+            
+            self.q_inputs[i].blockSignals(True) # signaux
+
             self.q_inputs[i].setValue(
                 self.last_valid_q[i]
             )
+            
+            self.q_inputs[i].blockSignals(False) # signaux
 
         self.compute_ctr_configuration(
             self.last_valid_q
@@ -762,7 +884,7 @@ class MainApp(QMainWindow):
 
 
 
-        print("Nouvelle position Home :", self.home_q)
+        # print("Nouvelle position Home :", self.home_q)
 
     def go_home(self):
 
@@ -778,7 +900,9 @@ class MainApp(QMainWindow):
         self.apply_configuration()
 
         
-    def on_spinbox_changed(self):
+    def on_spinbox_changed(self, active_index):
+
+        self.active_actuator = active_index
 
         if self.auto_apply_checkbox.isChecked():
 
@@ -787,16 +911,62 @@ class MainApp(QMainWindow):
                 for i in range(6)
             ]
 
+            q_values = self.enforce_telescopic_constraints(
+                q_values,
+                active_index
+            )
+
+            for i in range(6):
+                self.q_inputs[i].blockSignals(True)
+                self.q_inputs[i].setValue(q_values[i])
+                self.q_inputs[i].blockSignals(False)
+
             self.compute_ctr_configuration(q_values)
 
-            self.current_q = list(q_values)
+            self.current_q = q_values.copy()
 
     def apply_configuration(self):
+
+        print("APPLY CALLED")
+
+        print("========== APPLY ==========")
+
+        print(
+            "Spinboxes =",
+            [self.q_inputs[i].value() for i in range(6)]
+        )
+
+        print(
+            "active_actuator =",
+            getattr(self, "active_actuator", None)
+        )
+
+        ####
 
         q_values = [ # Permet la génération de plusieurs positions intermédiaire
             self.q_inputs[i].value()
             for i in range(6)
         ]
+
+        active = getattr(
+                self,
+                "active_actuator",
+                0
+        )
+
+        print("Avant correction :", q_values)
+        
+        q_values = self.enforce_telescopic_constraints(
+            q_values,
+            active
+        )
+
+        for i in range(6):
+            self.q_inputs[i].blockSignals(True)
+            self.q_inputs[i].setValue(q_values[i])
+            self.q_inputs[i].blockSignals(False)
+
+        print("Après correction :", q_values)
 
         self.animate_to_configuration(
             q_values
@@ -825,8 +995,13 @@ class MainApp(QMainWindow):
     def set_status_collision(self, message):
 
         self.robot_state_label.setText(
-            f"🔴 Collision : {message}"
+            f"🔴 Collision détectée :\n"
+            f"{message}\n"
+            f"Dernière configuration valide mémorisée.\n"
+            f'Cliquer sur "Dernière position valide".'
         )
+
+        self.robot_state_label.setWordWrap(True)
 
         self.robot_state_label.setStyleSheet(
             """
@@ -841,8 +1016,13 @@ class MainApp(QMainWindow):
     def set_status_divergence(self, message):
 
         self.robot_state_label.setText(
-            f"🟠 Solver divergence : {message}"
+            f"🟠 Divergence du solveur :\n"
+            f"{message}\n"
+            f"Dernière configuration valide mémorisée.\n"
+            f'Cliquer sur "Dernière position valide".'
         )
+
+        self.robot_state_label.setWordWrap(True)
 
         self.robot_state_label.setStyleSheet(
             """
@@ -920,6 +1100,21 @@ class MainApp(QMainWindow):
                 "build"
             )
 
+            # --- debugging ---
+            print(
+                "beta1 beta2 beta3 =",
+                q_values[0],
+                q_values[1],
+                q_values[2]
+            )
+
+            print(
+                repr(q_values[0]),
+                repr(q_values[1]),
+                repr(q_values[2])
+            )
+
+            # Appel du solveur
             result = subprocess.run(
                 cmd,
                 cwd=build_dir,
@@ -1038,6 +1233,9 @@ class MainApp(QMainWindow):
         t0 = time.perf_counter()
         if not self.steps_data or self.current_step >= len(self.steps_data):
             return
+        
+        # === RÉCUPÉRATION DES TRANSLATIONS COURANTES ===
+        q_current = [self.q_inputs[i].value() for i in range(3)]
 
         # Récupération de la matrice (19, N) pré-filtrée
         step = self.steps_data[self.current_step]
@@ -1173,18 +1371,20 @@ class MainApp(QMainWindow):
             self.tip_path_y.append(tip_y)
             self.tip_path_z.append(tip_z)
 
-        tip_angle_x = np.degrees(
-            np.arccos(np.clip(t_x, -1.0, 1.0))
+
+        rotation = Rot.from_matrix(R_tip)
+
+
+        # print(rotation.as_euler('xyz', degrees=True))
+
+        # print("R_tip =")
+        # print(R_tip)
+
+        tip_angle_x, tip_angle_y, tip_angle_z = rotation.as_euler(
+            'xyz',
+            degrees=True
         )
 
-        tip_angle_y = np.degrees(
-            np.arccos(np.clip(t_y, -1.0, 1.0))
-        )
-
-        tip_angle_z = np.degrees(
-            np.arccos(np.clip(t_z, -1.0, 1.0))
-        )
-    
 
 
         if len(self.tip_orientation_history["x"]) == 0:
@@ -1209,6 +1409,7 @@ class MainApp(QMainWindow):
         # Axes du repère
         axis_len = 0.03
 
+
         self.ax_robot.quiver(
             0, 0, 0,
             axis_len, 0, 0,
@@ -1227,9 +1428,48 @@ class MainApp(QMainWindow):
             color='b'
         )
 
+        # Axes du repère de l'organe terminal
+
+        axis_len_tip = 0.02
+
+        x_axis = R_tip[:, 0]
+        y_axis = R_tip[:, 1]
+        z_axis = R_tip[:, 2]
+
+        # Axe X local
+        self.ax_robot.quiver(
+            tip_x, tip_y, tip_z,
+            R_tip[0,0] * axis_len_tip,
+            R_tip[1,0] * axis_len_tip,
+            R_tip[2,0] * axis_len_tip,
+            color='r',
+            linewidth=1
+        )
+
+        # Axe Y local
+        self.ax_robot.quiver(
+            tip_x, tip_y, tip_z,
+            R_tip[0,1] * axis_len_tip,
+            R_tip[1,1] * axis_len_tip,
+            R_tip[2,1] * axis_len_tip,
+            color='g',
+            linewidth=1
+        )
+
+        # Axe Z local
+        self.ax_robot.quiver(
+            tip_x, tip_y, tip_z,
+            R_tip[0,2] * axis_len_tip,
+            R_tip[1,2] * axis_len_tip,
+            R_tip[2,2] * axis_len_tip,
+            color='b',
+            linewidth=1
+        )
+
+
         # ========= FANTÔME =========
 
-        print("ghost =", self.ghost_robot)
+        # print("ghost =", self.ghost_robot)
 
         if (
             self.ghost_robot is not None
@@ -1243,17 +1483,6 @@ class MainApp(QMainWindow):
             g_ext = self.ghost_robot["end_ext"]
             g_mid = self.ghost_robot["end_mid"]
             g_int = self.ghost_robot["end_int"]
-
-            print("DRAWING GHOST")
-
-            print("Ghost first point:", gx[0], gy[0], gz[0])
-            print("Current first point:", x[0], y[0], z[0])
-
-            print("Ghost last point:", gx[-1], gy[-1], gz[-1])
-            print("Current last point:", x[-1], y[-1], z[-1])
-
-            print("Fantôme enregistré")
-            print("Tip fantôme :", x[-1], y[-1], z[-1])
 
             self.ax_robot.plot(
                 gx[:g_ext],
@@ -1281,6 +1510,41 @@ class MainApp(QMainWindow):
                 alpha=0.25,
                 linewidth=(2*self.r_tube[2])*scale
             )
+
+
+        # ========= RENDU DES CHARIOTS (ACTIONNEURS LOGICIELS) =========
+        if self.show_carriages_checkbox.isChecked():
+            # Position fixe en X et Y pour la glissière linéaire (alignée sur l'axe Z)
+            carriage_x = 0
+            carriage_y = 0
+            
+            # Représentation des 3 chariots par des gros marqueurs carrés distincts
+            # Tube 1 (Interne)
+            self.ax_robot.scatter(
+                carriage_x, carriage_y, q_current[0],
+                color='lightgray', marker='s', s=250, edgecolors='black', 
+                label='Carriage 1 (Int)'
+            )
+            # Tube 2 (Intermédiaire)
+            self.ax_robot.scatter(
+                carriage_x, carriage_y, q_current[1],
+                color='dimgray', marker='s', s=350, edgecolors='black',
+                label='Carriage 2 (Mid)'
+            )
+            # Tube 3 (Externe)
+            self.ax_robot.scatter(
+                carriage_x, carriage_y, q_current[2],
+                color='black', marker='s', s=450, edgecolors='black',
+                label='Carriage 3 (Ext)'
+            )
+            
+            # Dessin de la glissière / axe de guidage en arrière-plan
+            self.ax_robot.plot(
+                [0, 0], [0, 0], [-0.40, 0.05],
+                color='blue', linestyle=':', linewidth=1.5, alpha=0.5
+            )
+
+
 
         # AFFICHAGE 3D CTR
         self.ax_robot.set_title("Modélisation CTR en 3D")

@@ -66,6 +66,21 @@ int main(int argc, char** argv)
 
     std::cout << "q = " << q.transpose() << std::endl;
 
+    // Afficher ce qui ce passe entre les chariots (debugging)
+    std::cout << "beta1 = " << q(0) << std::endl;
+    std::cout << "beta2 = " << q(1) << std::endl;
+    std::cout << "beta3 = " << q(2) << std::endl;
+
+
+    std::cout
+    << "setprecision(16)=" << std::setprecision(16);
+
+    std::cout
+    << "beta1=" << beta(i)
+    << " beta2=" << beta(i+1)
+    << std::endl;
+
+
     //--------------------------------------------------
     // CALCUL
     //--------------------------------------------------
@@ -177,13 +192,13 @@ int main(int argc, char** argv)
 
     // std::cout << "\n=== S ===\n";
 
-    for(int i = 0; i < ctr.segmented.S.size(); ++i)
-    {
-        std::cout
-        << "S = "
-        << ctr.segmented.S.transpose()
-        << std::endl;
-    }
+    // for(int i = 0; i < ctr.segmented.S.size(); ++i)
+    // {
+    //     std::cout
+    //     << "S = "
+    //     << ctr.segmented.S.transpose()
+    //     << std::endl;
+    // }
 
     file << "# iEnd "
         << ctr.segmented.iEnd(0) << " "
@@ -199,7 +214,7 @@ int main(int argc, char** argv)
 
     file << "\n";
 
-    std::cout << "================\n";
+    // std::cout << "================\n";
     // ---------------------
 
 
@@ -245,9 +260,9 @@ int main(int argc, char** argv)
 
     file.close();
 
-    std::cout
-        << "robot_backbone.txt mis à jour."
-        << std::endl;
+    // std::cout
+    //     << "robot_backbone.txt mis à jour."
+    //     << std::endl;
 
     return 0;
 }
