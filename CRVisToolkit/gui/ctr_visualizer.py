@@ -50,3 +50,49 @@ class CTRVisualizer:
             z[-1],
             s=40
         )
+    
+    def draw_tip_frame(
+    self,
+    tip_x,
+    tip_y,
+    tip_z,
+    R_tip
+    ):
+
+        axis_len_tip = 0.02
+
+        # Axe X
+        self.ax_robot.quiver(
+            tip_x,
+            tip_y,
+            tip_z,
+            R_tip[0, 0] * axis_len_tip,
+            R_tip[1, 0] * axis_len_tip,
+            R_tip[2, 0] * axis_len_tip,
+            color="r",
+            linewidth=1
+        )
+
+        # Axe Y
+        self.ax_robot.quiver(
+            tip_x,
+            tip_y,
+            tip_z,
+            R_tip[0, 1] * axis_len_tip,
+            R_tip[1, 1] * axis_len_tip,
+            R_tip[2, 1] * axis_len_tip,
+            color="g",
+            linewidth=1
+        )
+
+        # Axe Z
+        self.ax_robot.quiver(
+            tip_x,
+            tip_y,
+            tip_z,
+            R_tip[0, 2] * axis_len_tip,
+            R_tip[1, 2] * axis_len_tip,
+            R_tip[2, 2] * axis_len_tip,
+            color="b",
+            linewidth=1
+        )
