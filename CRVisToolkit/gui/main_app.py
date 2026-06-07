@@ -503,7 +503,7 @@ class MainApp(QMainWindow):
         )
 
 
-        # ghost robot
+        # Affichage des chariots du ghost robot
         self.ghost_checkbox = QCheckBox(
             "Afficher dernière position mémorisé"
         )
@@ -514,9 +514,18 @@ class MainApp(QMainWindow):
             self.update_plots
         )
 
-        config_layout.addWidget(
-            self.ghost_checkbox
+        config_layout.addWidget(self.ghost_checkbox)
+
+        # Affichage des chariots
+
+        self.chariots_checkbox = QCheckBox(
+            "Afficher les chariots (Base)"
         )
+        self.chariots_checkbox.setChecked(False)
+        self.chariots_checkbox.toggled.connect(
+            self.update_plots
+        )
+        config_layout.addWidget(self.chariots_checkbox)
 
         config_group.setLayout(
             config_layout
