@@ -14,13 +14,13 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QLocale
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from scipy.spatial.transform import Rotation as Rot
- 
 from ctr_data import CTRData
-
 from ctr_visualizer import CTRVisualizer
-
 from ctr_graph import CTRGraphs
+from ctr_constraints import CTRConstraints
+from ctr_loader import CTRLoader
+from ctr_status import CTRStatus
+from ctr_solver import CTRSolver
 
 
 
@@ -61,7 +61,9 @@ class MainApp(QMainWindow):
         # Définition de la longueur de précourbure (50 mm d'après le csv)
         self.l_kappa = 0.05
 
-        self.load_trajectory_data()
+        self.steps_data = CTRLoader.load(
+            self.data_path
+        )
 
         self.ghost_robot = None
 
@@ -114,76 +116,6 @@ class MainApp(QMainWindow):
         self.compute_ctr_configuration(self.current_q)
 
         self.set_current_as_home()
-
-
-
-    def load_trajectory_data(self):
-        """Parser horizontal : Valide les blocs contenant exactement 19 lignes de variables."""
-        if not os.path.exists(self.data_path):
-            print(f"Erreur : Fichier introuvable à l'emplacement : {self.data_path}")
-            self.steps_data = []
-            return
-
-        with open(self.data_path, "r") as f:
-            content = f.read()
-
-        blocks = content.strip().split("--- STEP_BREAK ---")
-        self.steps_data = []
-
-        for b in blocks:
-            lines = [
-                l.strip()
-                for l in b.split('\n') if l.strip()
-            ]
-
-            iEnd = None
-            S = None
-
-            data_lines = []
-
-            for line in lines:
-
-                if line.startswith("# iEnd"):
-
-                    vals = line.split()[2:]
-
-                    iEnd = np.array(
-                        list(map(int, vals))
-                    )
-
-                elif line.startswith("# S"):
-
-                    vals = line.split()[2:]
-
-                    S = np.array(
-                        list(map(float, vals))
-                    )
-
-                else:
-
-                    data_lines.append(line)
-
-                if len(data_lines) == 19:
-
-                    matrix_lines = [
-                        list(map(float, line.split()))
-                        for line in data_lines
-                    ]
-
-                    arr = np.array(matrix_lines)
-
-                    self.steps_data.append(
-                        {
-                            "matrix": arr,
-                            "iEnd": iEnd,
-                            "S": S
-                        }
-                    )
-
-
-
-
-
 
 
     def init_ui(self):
@@ -356,6 +288,7 @@ class MainApp(QMainWindow):
             self.robot_state_label
         )
 
+        # Crée l'affichage des coordonnées de l'organe terminal
         self.tip_info_label = QLabel(
             "Organe terminal:\n"
             "x = --- mm\n"
@@ -378,11 +311,15 @@ class MainApp(QMainWindow):
             self.tip_info_label
         )
 
+
         self.error_label = QLabel("")
-
         self.error_label.setWordWrap(True)
-
         diagnostic_layout.addWidget(
+            self.error_label
+        )
+
+        self.status = CTRStatus(
+            self.robot_state_label,
             self.error_label
         )
 
@@ -690,94 +627,6 @@ class MainApp(QMainWindow):
         )
 
 
-    # Gestion de la correction telescopique
-
-    def enforce_telescopic_constraints(self,q,active):
-
-        # Longueurs tubes
-        l1 = 0.463
-        l2 = 0.3305
-        l3 = 0.199
-
-        ### Convention générale pour toutes les positions
-        
-        # Tube 1 = interne
-        # Tube 2 = intermédiaire
-        # Tube 3 = externe
-        
-        # beta1 < beta2 < beta3
-        
-        # tip1 > tip2 > tip3
-        
-        ###
-
-        eps = 0.005
-
-        q = list(q)
-
-        # -------------------
-        # Tube 1 déplacé
-        # -------------------
-
-        if active == 0:
-
-            if q[1] < q[0] + eps:
-                q[1] = q[0] + eps
-
-            if q[2] < q[1] + eps:
-                q[2] = q[1] + eps
-
-        # -------------------
-        # Tube 2 déplacé
-        # -------------------
-
-        elif active == 1:
-
-            if q[1] < q[0] + eps:
-                q[1] = q[0] + eps
-
-            if q[2] < q[1] + eps:
-                q[2] = q[1] + eps
-
-        # -------------------
-        # Tube 3 déplacé
-        # -------------------
-
-        elif active == 2:
-
-            if q[2] < q[1] + eps:
-                q[2] = q[1] + eps
-        
-
-        # Calcul des positions des pointes
-        tip1 = l1 + q[0]
-        tip2 = l2 + q[1]
-        tip3 = l3 + q[2]
-
-        # -------------------
-        # Collision distale tube 1 / tube 2
-        # -------------------
-
-        if tip1 <= tip2 + eps:
-
-            q[1] = q[0] + (l1 - l2) - eps
-
-            tip2 = l2 + q[1]
-
-        # -------------------
-        # Collision distale tube 2 / tube 3
-        # -------------------
-
-        if tip2 <= tip3 + eps:
-
-            q[2] = q[1] + (l2 - l3) - eps
-
-            tip3 = l3 + q[2]
-
-        return q
-
-
-
 
     def go_last_valid(self):
 
@@ -810,44 +659,22 @@ class MainApp(QMainWindow):
         if self.steps_data:
 
             step = self.steps_data[self.current_step]
+                
+            try:
+                data = CTRData(step["matrix"], step["iEnd"], step["S"])
 
-            matrix_data = step["matrix"]
-            iEnd = step["iEnd"]
-            S = step["S"]
+                self.ghost_robot = {
+                    "x": data.x.copy(),
+                    "y": data.y.copy(),
+                    "z": data.z.copy(),
+                    "end_ext": data.end_ext,
+                    "end_mid": data.end_mid,
+                    "end_int": data.end_int
+                }
 
-            xyz = matrix_data[0:3, :].T
+            except Exception as e:
+                self.ghost_robot = None
 
-            dxyz = np.diff(xyz, axis=0)
-
-            dl = np.linalg.norm(dxyz, axis=1)
-
-            length_axis = np.concatenate(([0], np.cumsum(dl)))
-
-            s_ext = S[iEnd[2]]
-            s_mid = S[iEnd[1]]
-
-            end_ext = np.argmin(
-                np.abs(length_axis - s_ext)
-            ) + 1
-
-            end_mid = np.argmin(
-                np.abs(length_axis - s_mid)
-            ) + 1
-
-            end_int = matrix_data.shape[1]
-
-            x = matrix_data[0,:].copy()
-            y = matrix_data[1,:].copy()
-            z = matrix_data[2,:].copy()
-
-            self.ghost_robot = {
-                "x": x,
-                "y": y,
-                "z": z,
-                "end_ext": end_ext,
-                "end_mid": end_mid,
-                "end_int": end_int
-            }
 
     def go_home(self):
 
@@ -874,7 +701,7 @@ class MainApp(QMainWindow):
                 for i in range(6)
             ]
 
-            q_values = self.enforce_telescopic_constraints(
+            q_values = CTRConstraints.enforce_telescopic_constraints(
                 q_values,
                 active_index
             )
@@ -901,7 +728,7 @@ class MainApp(QMainWindow):
                 0
         )
         
-        q_values = self.enforce_telescopic_constraints(
+        q_values = CTRConstraints.enforce_telescopic_constraints(
             q_values,
             active
         )
@@ -915,67 +742,6 @@ class MainApp(QMainWindow):
             q_values
         )
 
-
-    def set_status_ok(self):
-
-        self.robot_state_label.setText(
-            "🟢 OK"
-        )
-
-        self.robot_state_label.setWordWrap(True) # sinon le message sera tronqué
-
-        self.robot_state_label.setStyleSheet(
-            """
-            color: green;
-            font-weight: bold;
-            font-size: 14px;
-            """
-        )
-
-        self.error_label.setText("")
-
-
-    def set_status_collision(self, message):
-
-        self.robot_state_label.setText(
-            f"🔴 Collision détectée :\n"
-            f"{message}\n"
-            f"Dernière configuration valide mémorisée.\n"
-            f'Cliquer sur "Dernière position valide".'
-        )
-
-        self.robot_state_label.setWordWrap(True)
-
-        self.robot_state_label.setStyleSheet(
-            """
-            color: red;
-            font-weight: bold;
-            font-size: 14px;
-            """
-        )
-
-        self.error_label.setText("")
-
-    def set_status_divergence(self, message):
-
-        self.robot_state_label.setText(
-            f"🟠 Divergence du solveur :\n"
-            f"{message}\n"
-            f"Dernière configuration valide mémorisée.\n"
-            f'Cliquer sur "Dernière position valide".'
-        )
-
-        self.robot_state_label.setWordWrap(True)
-
-        self.robot_state_label.setStyleSheet(
-            """
-            color: orange;
-            font-weight: bold;
-            font-size: 14px;
-            """
-        )
-
-        self.error_label.setText("")
     
     def save_plot(self):
 
@@ -1015,60 +781,39 @@ class MainApp(QMainWindow):
                 str(e)
             )
 
-    def compute_ctr_configuration(self, q_values):
-
+    def compute_ctr_configuration(
+        self,
+        q_values
+    ):
 
         try:
 
-            project_parent = os.path.dirname(root_toolkit)
-
-            executable = os.path.join(
-                project_parent,
-                "Modeling-and-Control-of-Concentric-Tube-Continuum-Robots",
-                "build",
-                "demo",
-                "004_interactive_control"
+            result = CTRSolver.run(
+                root_toolkit,
+                q_values
             )
 
-            cmd = [executable] + [ # q_value contient float et subprocess.run() attend str
-                str(q)
-                for q in q_values
-            ]
+            if not result["success"]:
 
-            build_dir = os.path.join(
-                project_parent,
-                "Modeling-and-Control-of-Concentric-Tube-Continuum-Robots",
-                "build"
+                if result["status"] == "collision":
+
+                    self.status.set_collision(
+                        result["message"]
+                    )
+
+                elif result["status"] == "divergence":
+
+                    self.status.set_divergence(
+                        result["message"]
+                    )
+
+                return False
+
+            self.status.set_ok()
+
+            self.steps_data = CTRLoader.load(
+                self.data_path
             )
-
-            # Appel du solveur
-            result = subprocess.run(
-                cmd,
-                cwd=build_dir,
-                capture_output=True,
-                text=True
-            )
-
-            print(result.stdout)
-
-            for line in result.stdout.splitlines():
-
-                lower_line = line.lower()
-
-                if "clashing" in lower_line:
-
-                    self.set_status_collision(line)
-                    return False
-
-                if "failed to converge" in lower_line:
-
-                    self.set_status_divergence(line)
-                    return False
-
-
-            self.set_status_ok()
-
-            self.load_trajectory_data()
 
             self.current_step = 0
 
@@ -1079,6 +824,9 @@ class MainApp(QMainWindow):
         except Exception as e:
 
             print("Erreur :", e)
+
+            return False
+        
 
     def animate_to_configuration(self, target_q):
 
@@ -1232,13 +980,6 @@ class MainApp(QMainWindow):
                 label="Tip path"
             )
 
-        # Calcul de l'orientation pointe
-        R_tip = matrix_data[3:12, -1].reshape((3, 3), order='C')
-
-        tip_x = matrix_data[0, -1]
-        tip_y = matrix_data[1, -1]
-        tip_z = matrix_data[2, -1]
-
         # Historique de la pointe, on évite de stocker 50 fois le même point
         if len(self.tip_path_x) == 0:
             self.tip_path_x.append(tip_x)
@@ -1253,15 +994,6 @@ class MainApp(QMainWindow):
             self.tip_path_x.append(tip_x)
             self.tip_path_y.append(tip_y)
             self.tip_path_z.append(tip_z)
-
-
-        rotation = Rot.from_matrix(R_tip)
-
-        tip_angle_x, tip_angle_y, tip_angle_z = rotation.as_euler(
-            'xyz',
-            degrees=True
-        )
-
 
 
         if len(self.tip_orientation_history["x"]) == 0:

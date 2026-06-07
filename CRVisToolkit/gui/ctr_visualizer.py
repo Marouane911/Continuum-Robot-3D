@@ -21,7 +21,7 @@ class CTRVisualizer:
             x[:end_ext],
             y[:end_ext],
             z[:end_ext],
-            linewidth=(2 * r_tube[0]) * scale,
+            linewidth=(2 * r_tube[0]) * scale * 3,
             color="black"
         )
 
@@ -30,7 +30,7 @@ class CTRVisualizer:
             x[end_ext - 1:end_mid],
             y[end_ext - 1:end_mid],
             z[end_ext - 1:end_mid],
-            linewidth=(2 * r_tube[1]) * scale,
+            linewidth=(2 * r_tube[1]) * scale * 2,
             color="dimgray"
         )
 
@@ -144,7 +144,7 @@ class CTRVisualizer:
             gz[:g_ext],
             color="cyan",
             alpha=0.25,
-            linewidth=(2 * r_tube[0]) * scale
+            linewidth=(2 * r_tube[0]) * scale * 3
         )
 
         self.ax_robot.plot(
@@ -153,7 +153,7 @@ class CTRVisualizer:
             gz[g_ext - 1:g_mid],
             color="cyan",
             alpha=0.25,
-            linewidth=(2 * r_tube[1]) * scale
+            linewidth=(2 * r_tube[1]) * scale * 2
         )
 
         self.ax_robot.plot(

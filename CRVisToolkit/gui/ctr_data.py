@@ -26,21 +26,27 @@ class CTRData:
             ([0], np.cumsum(dl))
         )
 
+        # iEnd[2] correspond au tube 3 (externe, le plus court)
+        # iEnd[1] correspond au tube 2 (intermédiaire)
+        # iEnd[0] correspond au tube 1 (interne, le plus long et va jusqu'à num_nodes)
         self.s_ext = S[iEnd[2]]
         self.s_mid = S[iEnd[1]]
 
+        # end_ext est la fin du tube externe (zone la plus rigide à 3 tubes)
         self.end_ext = (
             np.argmin(
                 np.abs(self.length_axis - self.s_ext)
             ) + 1
         )
 
+        # end_mid est la fin du tube intermédiaire (zone à 2 tubes)
         self.end_mid = (
             np.argmin(
                 np.abs(self.length_axis - self.s_mid)
             ) + 1
         )
 
+        # end_mid est la fin du tube interne (l'organe terminal)
         self.end_int = self.num_nodes
 
         self.tip_x = self.x[-1]

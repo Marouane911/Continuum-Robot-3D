@@ -146,6 +146,11 @@ class CTRGraphs:
         self.ax_plots.plot(data.length_axis, t2_display, 'b-', markersize=2, label=r"$\theta_2(s)$")
         self.ax_plots.plot(data.length_axis, t3_display, 'r-', markersize=2, label=r"$\theta_3(s)$")
 
+        # self._set_twist_ylim(
+        #     t2_display,
+        #     t3_display
+        # )
+
         l_transition1 = data.length_axis[data.end_ext - 1]
         l_transition2 = data.length_axis[data.end_mid - 1]
 
@@ -153,21 +158,23 @@ class CTRGraphs:
         self.ax_plots.axvline(x=l_transition2, color='purple', linestyle='--', alpha=0.7, label="End T2 (Mid)")
 
         # Zones de précourbure
+        # Zone de précourbure Tube 3 (Externe)
         start_curve_t3 = l_transition1 - self.l_kappa
-        if start_curve_t3 > 0:
+        if start_curve_t3 >= 0:
             self.ax_plots.axvline(x=start_curve_t3,color='darkorange', linestyle=':', linewidth=2.5, label=r"Start curve T3")
             self.ax_plots.axvspan(start_curve_t3, l_transition1, color='orange', alpha=0.07, zorder=1)
 
+        # Zone de précourbure Tube 2 (Intermédiaire)
         start_curve_t2 = l_transition2 - self.l_kappa
-        if start_curve_t2 > 0:
+        if start_curve_t2 >= 0:
             self.ax_plots.axvline(x=start_curve_t2, color='purple', linestyle=':', linewidth=2.5, label=r"Start curve T2")
             self.ax_plots.axvspan(start_curve_t2, l_transition2, color='purple', alpha=0.04, zorder=1)
 
+        # Zone de précourbure Tube 1 (Interne)
         l_end_t1 = data.length_axis[-1]
         start_curve_t1 = l_end_t1 - self.l_kappa
-        if start_curve_t1 > 0:
-            self.ax_plots.axvline(x=start_curve_t1, color='green', linestyle=':', linewidth=2.5,
-                                    label=r"Start curve T1 (Int)")
+        if start_curve_t1 >= 0:
+            self.ax_plots.axvline(x=start_curve_t1, color='green', linestyle=':', linewidth=2.5, label=r"Start curve T1 (Int)")
             self.ax_plots.axvspan(start_curve_t1, l_end_t1, color='green', alpha=0.03, zorder=1)
             # Ligne de fin désormais visible grâce à la marge de 5%
             self.ax_plots.axvline(x=l_end_t1, color='green', linestyle='--', alpha=0.7, label="End T1 (Tip)")
@@ -231,3 +238,4 @@ class CTRGraphs:
             textcoords="offset points",
             color="red"
         )
+
