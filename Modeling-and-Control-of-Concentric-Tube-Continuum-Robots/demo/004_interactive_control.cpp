@@ -4,6 +4,8 @@
 #include "loadParameters.h"
 #include "CtrModel.h"
 
+#include <iomanip>
+
 using namespace Eigen;
 using namespace CtrLib;
 
@@ -11,6 +13,9 @@ using namespace CtrLib;
 
 int main(int argc, char** argv)
 {
+
+    std::cout << std::fixed;
+
     if(argc != 7)
     {
         std::cout << std::endl;
@@ -20,6 +25,7 @@ int main(int argc, char** argv)
             << "q1 q2 q3 q4 q5 q6"
             << std::endl;
 
+        std::cerr << "ERROR: invalid number of arguments\n";
         return -1;
     }
 
@@ -32,6 +38,7 @@ int main(int argc, char** argv)
     if(loadParameters("../parameters/parameters.csv",
                       vParameters) != 0)
     {
+        std::cerr << "ERROR: invalid number of arguments\n";
         return -1;
     }
 
@@ -72,13 +79,7 @@ int main(int argc, char** argv)
     std::cout << "beta3 = " << q(2) << std::endl;
 
 
-    std::cout
-    << "setprecision(16)=" << std::setprecision(16);
-
-    std::cout
-    << "beta1=" << beta(i)
-    << " beta2=" << beta(i+1)
-    << std::endl;
+    std::cout << std::setprecision(16);
 
 
     //--------------------------------------------------
@@ -91,6 +92,7 @@ int main(int argc, char** argv)
             << "Configuration invalide"
             << std::endl;
 
+        std::cerr << "ERROR: invalid number of arguments\n";
         return -1;
     }
 
