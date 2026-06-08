@@ -5,7 +5,7 @@ import subprocess
 class CTRSolver:
 
     @staticmethod
-    def run(root_toolkit, q_values):
+    def run(root_toolkit, q_values, params_path):
 
         try:
             project_parent = os.path.dirname(root_toolkit)
@@ -24,7 +24,8 @@ class CTRSolver:
                 "build"
             )
 
-            cmd = [executable] + [str(q) for q in q_values]
+            # Ajout du chemin du fichier CSV comme 7ème argument pour le programme C++
+            cmd = [executable] + [str(q) for q in q_values] + [params_path]
 
             result = subprocess.run(
                 cmd,

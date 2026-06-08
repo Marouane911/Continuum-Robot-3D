@@ -16,13 +16,13 @@ int main(int argc, char** argv)
 
     std::cout << std::fixed;
 
-    if(argc != 7)
+    if(argc != 8)
     {
         std::cout << std::endl;
         std::cout << "Usage :" << std::endl;
         std::cout
             << "./004_interactive_control "
-            << "q1 q2 q3 q4 q5 q6"
+            << "q1 q2 q3 q4 q5 q6 /chemin/vers/parameters.csv"
             << std::endl;
 
         std::cerr << "ERROR: invalid number of arguments\n";
@@ -35,10 +35,12 @@ int main(int argc, char** argv)
 
     std::vector<parameters> vParameters;
 
-    if(loadParameters("../parameters/parameters.csv",
-                      vParameters) != 0)
+    // argv[7] contient le chemin absolu dynamique généré par Python
+    std::string params_path = argv[7];
+
+    if(loadParameters(params_path, vParameters) != 0)
     {
-        std::cerr << "ERROR: invalid number of arguments\n";
+        std::cerr << "ERROR: impossible de charger le fichier de parametres : " << params_path << "\n";
         return -1;
     }
 

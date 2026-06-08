@@ -2,6 +2,8 @@ import sys
 import os
 import numpy as np
 import subprocess
+import shutil
+import csv
  
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget,
@@ -42,9 +44,38 @@ class MainApp(QMainWindow):
         self.setWindowTitle("CTR VISUALIZATION TOOL")
         self.setGeometry(100, 100, 1400, 900)
 
+        # gestion de la modification des parameters
         # --- RECONSTRUCTION DU CHEMIN ABSOLU VERS LE REPO DE QUENTIN ---
         project_parent = os.path.dirname(root_toolkit)
 
+
+
+
+# --- GESTION DES PARAMÈTRES (COPIE PARFAITE) ---
+        self.params_path = os.path.join(
+            project_parent,
+            "Modeling-and-Control-of-Concentric-Tube-Continuum-Robots",
+            "parameters",
+            "parameters.csv"
+        )
+        
+        # === CORRECTION : On définit d'abord le chemin de base ===
+        self.temp_params_path = os.path.join(python_dir, "parameters_temp.csv")
+
+        # On le place dans le dossier python pour que le solver y accède facilement
+        self.temp_params_path_abs = os.path.abspath(self.temp_params_path)
+
+        # Sécurité : On force la copie propre depuis l'original pour réparer les 0.0
+        if os.path.exists(self.temp_params_path):
+            os.remove(self.temp_params_path)
+            
+        # === CORRECTION : On recrée le fichier temporaire propre ===
+        shutil.copy2(self.params_path, self.temp_params_path)
+
+
+
+
+        # Mettre à jour data_path si votre projet génère son backbone avec ce paramètre
         self.data_path = os.path.join(
             project_parent,
             "Modeling-and-Control-of-Concentric-Tube-Continuum-Robots",
@@ -87,22 +118,21 @@ class MainApp(QMainWindow):
         }
 
         self.home_q = [
-            -0.30,
-            -0.20,
+            -0.15,
             -0.10,
+            -0.005,
             0.0,
             0.0,
             0.0
         ]
         
-
         self.record_orientation_history = False
 
         # --- Mémoriser la dérnière configuration pour l'animation entre 2 positions entrées ---
         self.current_q = [
-            -0.30,
-            -0.20,
+            -0.15,
             -0.10,
+            -0.005,
             0.0,
             0.0,
             0.0
@@ -116,6 +146,7 @@ class MainApp(QMainWindow):
         self.compute_ctr_configuration(self.current_q)
 
         self.set_current_as_home()
+
 
 
 
@@ -345,9 +376,9 @@ class MainApp(QMainWindow):
         self.q_inputs = []
 
         default_values = [
-            -0.30,
-            -0.20,
-            -0.10,
+            -0.015,
+            -0.010,
+            -0.005,
             0.0,
             0.0,
             0.0
@@ -637,6 +668,89 @@ class MainApp(QMainWindow):
         )
 
 
+        # ==========================================================
+        # PARAMÈTRES PHYSIQUES (Friction & Longueur)
+        # ==========================================================
+        params_group = QGroupBox("Paramètres physiques")
+        params_layout = QGridLayout()
+
+        self.param_inputs = {}
+        keys = ['Ux1', 'Ux2', 'Ux3', 'l1', 'l2', 'l3']
+
+        display_names = {
+            'Ux1': "Courbure Initiale Tube 1",
+            'Ux2': "Courbure Initiale Tube 2",
+            'Ux3': "Courbure Initiale Tube 3",
+            'l1': "Longueur Totale Tube 1",
+            'l2': "Longueur Totale Tube 2",
+            'l3': "Longueur Totale Tube 3"
+        }
+        
+        # --- LECTURE DES VALEURS ACTUELLES DU CSV ---
+        current_csv_values = {}
+        try:
+            with open(self.temp_params_path, 'r') as f:
+                reader = list(csv.DictReader(f))
+                if reader:
+                    current_csv_values = reader[0]
+        except Exception as e:
+            print("Erreur de lecture initiale du CSV :", e)
+
+        for i, key in enumerate(keys):
+            friendly_name = display_names.get(key, key)
+            params_layout.addWidget(QLabel(friendly_name), i, 0)
+            spin = QDoubleSpinBox()
+            spin.setLocale(QLocale(QLocale.English, QLocale.UnitedStates))
+            spin.setDecimals(4)
+            spin.setSingleStep(1.0 if 'Ux' in key else 0.005)
+            spin.setRange(0, 100000)
+            
+            # Appliquer la vraie valeur du CSV si elle existe, sinon mettre une valeur de secours
+            val_init = float(current_csv_values.get(key, 0.0))
+            spin.setValue(val_init)
+            
+            self.param_inputs[key] = spin
+            params_layout.addWidget(spin, i, 1)
+
+        btn_save_params = QPushButton("Enregistrer et Appliquer")
+        btn_save_params.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
+        btn_save_params.clicked.connect(self.save_parameters_to_csv)
+        params_layout.addWidget(btn_save_params, 6, 0, 1, 2)
+        
+        params_group.setLayout(params_layout)
+        control_layout.addWidget(params_group)
+
+
+
+    def save_parameters_to_csv(self):
+            print("=== SAUVEGARDE ===")
+            print("Fichier :", self.temp_params_path)
+            
+            # --- MODIFICATION ICI : On vire le 'for key, spin in...' qui englobait tout ---
+
+            # 1. Lire le dictionnaire existant pour conserver toutes les autres colonnes intactes
+            with open(self.temp_params_path, 'r') as f:
+                reader = list(csv.DictReader(f))
+            
+            if not reader:
+                return
+                
+            row = reader[0]
+            # 2. Injecter les nouvelles valeurs modifiées par l'utilisateur
+            for key, spin in self.param_inputs.items():
+                row[key] = f"{spin.value():.6f}"
+                
+            # 3. Réécrire le fichier temporaire proprement
+            with open(self.temp_params_path, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=reader[0].keys())
+                writer.writeheader()
+                writer.writerows(reader)
+                                            
+            # 4. RECALCUL IMMÉDIAT : Le solver va maintenant lire les vraies nouvelles valeurs
+            q_values = [self.q_inputs[i].value() for i in range(6)]
+            self.compute_ctr_configuration(q_values)
+            
+
 
     def go_last_valid(self):
 
@@ -796,11 +910,15 @@ class MainApp(QMainWindow):
         q_values
     ):
 
+        print("=== COMPUTE CTR ===")
+        print("q =", q_values)
+
         try:
 
             result = CTRSolver.run(
                 root_toolkit,
-                q_values
+                q_values,
+                self.temp_params_path_abs
             )
 
             if not result["success"]:
@@ -1029,6 +1147,46 @@ class MainApp(QMainWindow):
 
         self.visualizer.draw_world_frame()
 
+
+# ========= RENDU DES CHARIOTS AVEC AXE DE LIAISON (AMÉLIORÉ) =========
+        if self.chariots_checkbox.isChecked():
+            colors = ['red', 'green', 'blue']
+            labels = ["Tube 1 (Interne)", "Tube 2 (Milieu)", "Tube 3 (Externe)"]
+            
+            # 1. Dessiner l'axe central (Z) transparent ou pointillé qui sert de guide
+            min_beta = min(q_current)
+            self.ax_robot.plot(
+                [0, 0], [0, 0], [min_beta * 1.1, 0],
+                color='gray', linestyle='--', linewidth=1, alpha=0.7
+            )
+            
+            # 2. Dessiner chaque chariot avec sa ligne de guidage et sa projection
+            for idx, beta in enumerate(q_current):
+                # Le point du chariot sur l'axe Z
+                self.ax_robot.plot(
+                    [0], [0], [beta], 
+                    marker='o', markersize=12, color=colors[idx],
+                    zorder=5, label=f"Chariot {labels[idx]}"
+                )
+                
+                # Une ligne horizontale (croisillon) pour accentuer l'effet de plateau/chariot
+                self.ax_robot.plot(
+                    [-0.01, 0.01], [0, 0], [beta, beta], 
+                    color=colors[idx], linewidth=2
+                )
+                self.ax_robot.plot(
+                    [0, 0], [-0.01, 0.01], [beta, beta], 
+                    color=colors[idx], linewidth=2
+                )
+
+                # Une ligne fine pointillée qui relie le chariot à la base visible du robot (Z=0)
+                # Cela permet de voir la "tige" virtuelle ou la partie cachée du tube
+                self.ax_robot.plot(
+                    [0, 0], [0, 0], [beta, 0],
+                    color=colors[idx], linestyle=':', linewidth=1.5, alpha=0.6
+                )
+
+
         # Axes du repère de l'organe terminal
 
         self.visualizer.draw_tip_frame(
@@ -1061,6 +1219,10 @@ class MainApp(QMainWindow):
         self.ax_robot.set_xlim(-max_xy, max_xy)
         self.ax_robot.set_ylim(-max_xy, max_xy)
         self.ax_robot.set_zlim(0.0, max_z)
+
+        # # On ajuste le Z minimal pour voir les chariots s'ils sont cochés
+        # min_z = min(q_current) * 1.2 if self.chariots_checkbox.isChecked() else 0.0
+        # self.ax_robot.set_zlim(min_z, max_z)
 
         # 3. Forcer le ratio 1:1:1 pour éviter les déformations visuelles du robot
         self.ax_robot.set_box_aspect((1, 1, 1))
@@ -1125,6 +1287,44 @@ class MainApp(QMainWindow):
             f"Y = {tip_angle_y:.1f}°\n"
             f"Z = {tip_angle_z:.1f}°"
         )
+
+        # ========= AFFICHAGE DES CHARIOTS (RAIL HORIZONTAL) =========
+        # 1. Nettoyage : On supprime l'ancien rail s'il existe pour éviter de superposer les graphiques
+        for ax in self.fig.axes:
+            if ax.get_label() == 'ax_chariots':
+                ax.remove()
+
+        if self.chariots_checkbox.isChecked():
+            # 2. Création d'un axe très fin en bas de l'écran [gauche, bas, largeur, hauteur]
+            ax_chariots = self.fig.add_axes([0.15, 0.04, 0.30, 0.03], label='ax_chariots')
+            
+            
+            colors = ['red', 'green', 'blue']
+            
+            # Ligne de guidage horizontale (le rail)
+            ax_chariots.axhline(y=0, color='gray', linestyle='-', linewidth=2, alpha=0.5)
+            
+            # Positionnement des curseurs de chariots (sans texte)
+            for idx, beta in enumerate(q_current):
+                # On utilise un marqueur vertical '|' très épais pour simuler la butée
+                ax_chariots.plot(
+                    beta * 1000, 0, 
+                    marker='|', markersize=25, markeredgewidth=4, 
+                    color=colors[idx]
+                )
+            
+            # Décoration minimale de l'axe
+            ax_chariots.set_xlim(-400, 50) # Plage fixe pour ne pas que l'échelle bouge
+            ax_chariots.set_ylim(-1, 1)
+            
+            # Masquer complètement l'axe Y et affiner l'axe X
+            ax_chariots.get_yaxis().set_visible(False)
+            ax_chariots.set_xlabel("Espace de translation des tubes (mm)", fontsize=10, fontweight='bold', color='#333333')
+            ax_chariots.spines['top'].set_visible(False)
+            ax_chariots.spines['right'].set_visible(False)
+            ax_chariots.spines['left'].set_visible(False)
+            ax_chariots.grid(True, axis='x', linestyle=':', alpha=0.6)
+            
         self.canvas.draw_idle()
 
 

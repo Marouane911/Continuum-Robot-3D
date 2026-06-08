@@ -22,7 +22,7 @@ class CTRVisualizer:
             y[:end_ext],
             z[:end_ext],
             linewidth=(2 * r_tube[2]) * scale * 3,
-            color="black",
+            color="red",
             solid_capstyle="butt" # Coupe nette des extrémités
         )
 
@@ -32,7 +32,7 @@ class CTRVisualizer:
             y[end_ext - 1:end_mid],
             z[end_ext - 1:end_mid],
             linewidth=(2 * r_tube[1]) * scale * 2,
-            color="dimgray",
+            color="green",
             solid_capstyle="butt" # Coupe nette des extrémités
         )
 
@@ -42,7 +42,7 @@ class CTRVisualizer:
             y[end_mid - 1:end_int],
             z[end_mid - 1:end_int],
             linewidth=(2 * r_tube[0]) * scale,
-            color="lightgray",
+            color="blue",
             solid_capstyle="butt" # Coupe nette des extrémités
         )
         
