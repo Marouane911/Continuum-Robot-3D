@@ -45,13 +45,13 @@ class MainApp(QMainWindow):
         self.setGeometry(100, 100, 1400, 900)
 
         # gestion de la modification des parameters
-        # --- RECONSTRUCTION DU CHEMIN ABSOLU VERS LE REPO DE QUENTIN ---
+        # RECONSTRUCTION DU CHEMIN ABSOLU VERS LE REPO DE QUENTIN 
         project_parent = os.path.dirname(root_toolkit)
 
 
 
 
-# --- GESTION DES PARAMÈTRES (COPIE PARFAITE) ---
+# GESTION DES PARAMÈTRES (COPIE PARFAITE DANS parameters_temp.csv)
         self.params_path = os.path.join(
             project_parent,
             "Modeling-and-Control-of-Concentric-Tube-Continuum-Robots",
@@ -118,8 +118,8 @@ class MainApp(QMainWindow):
         }
 
         self.home_q = [
-            -0.15,
-            -0.10,
+            -0.015,
+            -0.010,
             -0.005,
             0.0,
             0.0,
@@ -130,8 +130,8 @@ class MainApp(QMainWindow):
 
         # --- Mémoriser la dérnière configuration pour l'animation entre 2 positions entrées ---
         self.current_q = [
-            -0.15,
-            -0.10,
+            -0.015,
+            -0.010,
             -0.005,
             0.0,
             0.0,
@@ -140,8 +140,19 @@ class MainApp(QMainWindow):
 
         self.last_valid_q = self.current_q.copy()
 
-        self.saved_elev = 20
-        self.saved_azim = -45
+        # === MULTI-MODIFICATION : SAUVEGARDE DYNAMIQUE DE LA POSITION DE LA CAMÉRA ===
+        current_elev = getattr(self, "saved_elev", 20)
+        current_azim = getattr(self, "saved_azim", -45)
+        # AJOUT : On récupère la distance actuelle (le zoom) choisie par l'utilisateur à la souris. 
+        # Si elle n'existe pas encore, on met 10 par défaut (la valeur standard de Matplotlib).
+        current_dist = getattr(self, "saved_dist", 10)
+
+        self.ax_robot.cla()
+        self.ax_plots.cla()
+        
+        # Mémorisation immédiate des angles et du zoom pour le prochain rafraîchissement
+        self.ax_robot.view_init(elev=current_elev, azim=current_azim)
+        self.ax_robot.dist = current_dist
 
         self.compute_ctr_configuration(self.current_q)
 
@@ -580,7 +591,7 @@ class MainApp(QMainWindow):
         self.graph_selector = QComboBox()
 
         self.graph_selector.addItems([
-            "Orientation of the local tangent along the CTR",
+            "Orientation along the CTR",
             "Tip orientation history",
             "Accumulated relative twist from base (MICRO view)"
         ])
@@ -625,7 +636,7 @@ class MainApp(QMainWindow):
         # ==========================================================
 
         self.fig = Figure(
-            figsize=(12, 8)
+            figsize=(6, 9)
         )
 
         self.canvas = FigureCanvas(
@@ -678,9 +689,9 @@ class MainApp(QMainWindow):
         keys = ['Ux1', 'Ux2', 'Ux3', 'l1', 'l2', 'l3']
 
         display_names = {
-            'Ux1': "Courbure Initiale Tube 1",
-            'Ux2': "Courbure Initiale Tube 2",
-            'Ux3': "Courbure Initiale Tube 3",
+            'Ux1': "Courbure Tube 1",
+            'Ux2': "Courbure Tube 2",
+            'Ux3': "Courbure Tube 3",
             'l1': "Longueur Totale Tube 1",
             'l2': "Longueur Totale Tube 2",
             'l3': "Longueur Totale Tube 3"
@@ -1078,6 +1089,7 @@ class MainApp(QMainWindow):
         self.ax_robot.cla()
         self.ax_plots.cla()
         self.ax_robot.view_init(elev=current_elev, azim=current_azim)
+        
 
 
         # RENDU DU ROBOT 3D
@@ -1147,10 +1159,9 @@ class MainApp(QMainWindow):
 
         self.visualizer.draw_world_frame()
 
-
-# ========= RENDU DES CHARIOTS AVEC AXE DE LIAISON (AMÉLIORÉ) =========
+        # ========= RENDU DES CHARIOTS AVEC AXE DE LIAISON (AMÉLIORÉ) =========
         if self.chariots_checkbox.isChecked():
-            colors = ['red', 'green', 'blue']
+            colors = ['#08ff08', 'blue', 'red']
             labels = ["Tube 1 (Interne)", "Tube 2 (Milieu)", "Tube 3 (Externe)"]
             
             # 1. Dessiner l'axe central (Z) transparent ou pointillé qui sert de guide
@@ -1206,33 +1217,64 @@ class MainApp(QMainWindow):
                 self.r_tube
             )
 
-        # AFFICHAGE 3D CTR
-        self.ax_robot.set_title("Modélisation CTR en 3D")
+        # === MULTI-MODIFICATION : RIGIDIFICATION DU CADRE 3D (FINI LA GRILLE DANSANTE) ===
+        self.ax_robot.set_title("Modélisation CTR en 3D", pad=50, fontsize=12, fontweight='bold')
 
-        # 1. Calcul des limites dynamiques basées sur la géométrie réelle du robot
-        # On prend le max absolu en X et Y pour garder un repère centré et carré
-        max_xy = max(np.max(np.abs(x)), np.max(np.abs(y)), 0.05) * 1.2
-        # On ajuste le Z max avec une marge de 10% au-dessus de la pointe
-        max_z = max(np.max(z), 0.10) * 1.1
+        # 1. Définition des dimensions physiques fixes du cadre (en mètres)
+        XY_CADRE = 0.15     # Largeur de la boîte : +/- 8 cm à gauche et à droite
+        
+        # Le Z minimal descend à -15 cm si les chariots sont visibles pour les afficher proprement
+        Z_MIN_CADRE = -0.15 if self.chariots_checkbox.isChecked() else -0.02
+        Z_MAX_CADRE = 0.45   # Hauteur maximale du graphique fixe (35 cm)
 
-        # 2. Application des nouvelles limites adaptatives
-        self.ax_robot.set_xlim(-max_xy, max_xy)
-        self.ax_robot.set_ylim(-max_xy, max_xy)
-        self.ax_robot.set_zlim(0.0, max_z)
+        # 2. Application des limites strictes
+        self.ax_robot.set_xlim(-XY_CADRE, XY_CADRE)
+        self.ax_robot.set_ylim(-XY_CADRE, XY_CADRE)
+        self.ax_robot.set_zlim(Z_MIN_CADRE, Z_MAX_CADRE)
 
-        # # On ajuste le Z minimal pour voir les chariots s'ils sont cochés
-        # min_z = min(q_current) * 1.2 if self.chariots_checkbox.isChecked() else 0.0
-        # self.ax_robot.set_zlim(min_z, max_z)
+        # 3. ÉQUIVALENT "EQUAL AXES" 3D : On impose des proportions réalistes (sans déformation)
+        hauteur_totale = Z_MAX_CADRE - Z_MIN_CADRE
+        largeur_totale = 2 * XY_CADRE
 
-        # 3. Forcer le ratio 1:1:1 pour éviter les déformations visuelles du robot
-        self.ax_robot.set_box_aspect((1, 1, 1))
+        # on applique directement les dimensions physiques réelles
+        self.ax_robot.set_box_aspect((largeur_totale, largeur_totale, hauteur_totale))
+
+        self.ax_robot.dist = 15 # Dézoome de la zone matplolib 3D CTR
+
+        # === AJOUT : ENREGISTREMENT DU ZOOM ET DES ROTATIONS FAITS À LA SOURIS ===
+        # À chaque rafraîchissement, on mémorise la position de la caméra laissée par l'utilisateur
+        self.saved_elev = self.ax_robot.elev
+        self.saved_azim = self.ax_robot.azim
+        self.saved_dist = self.ax_robot.dist  # Sauvegarde du niveau de zoom !
+
+
+        # # AFFICHAGE 3D CTR
+        # self.ax_robot.set_title("Modélisation CTR en 3D")
+
+        # # 1. Calcul des limites dynamiques basées sur la géométrie réelle du robot
+        # # On prend le max absolu en X et Y pour garder un repère centré et carré
+        # max_xy = max(np.max(np.abs(x)), np.max(np.abs(y)), 0.05) * 1.2
+        # # On ajuste le Z max avec une marge de 10% au-dessus de la pointe
+        # max_z = max(np.max(z), 0.10) * 1.1
+
+        # # 2. Application des nouvelles limites adaptatives
+        # self.ax_robot.set_xlim(-max_xy, max_xy)
+        # self.ax_robot.set_ylim(-max_xy, max_xy)
+        # self.ax_robot.set_zlim(0.0, max_z)
+
+        # # # On ajuste le Z minimal pour voir les chariots s'ils sont cochés
+        # # min_z = min(q_current) * 1.2 if self.chariots_checkbox.isChecked() else 0.0
+        # # self.ax_robot.set_zlim(min_z, max_z)
+
+        # # 3. Forcer le ratio 1:1:1 pour éviter les déformations visuelles du robot
+        # self.ax_robot.set_box_aspect((1, 1, 1))
 
         # GRAPHES
         selected_graph = self.graph_selector.currentIndex()
 
         if selected_graph == 0:
 
-            self.graphs.plot_local_tangent_orientation(
+            self.graphs.plot_orientation(
                 matrix_data,
                 length_axis,
                 num_nodes
@@ -1299,7 +1341,7 @@ class MainApp(QMainWindow):
             ax_chariots = self.fig.add_axes([0.15, 0.04, 0.30, 0.03], label='ax_chariots')
             
             
-            colors = ['red', 'green', 'blue']
+            colors = ['#08ff08', 'blue', 'red']
             
             # Ligne de guidage horizontale (le rail)
             ax_chariots.axhline(y=0, color='gray', linestyle='-', linewidth=2, alpha=0.5)

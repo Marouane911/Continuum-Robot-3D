@@ -51,7 +51,7 @@ class CTRGraphs:
 
 
 
-    def plot_local_tangent_orientation(
+    def plot_orientation(
         self,
         matrix_data,
         length_axis,
@@ -69,8 +69,8 @@ class CTRGraphs:
                 order="C"
             )
 
-            t_x = R[0, 2]
-            t_y = R[1, 2]
+            t_x = R[0, 0]
+            t_y = R[1, 1]
             t_z = R[2, 2]
 
             orient_X[i] = np.degrees(
@@ -116,7 +116,7 @@ class CTRGraphs:
         )
 
         self.ax_plots.set_title(
-            "Orientation of the local tangent along the CTR",
+            "Orientation along the CTR",
             fontsize=11,
             fontweight="bold"
         )
@@ -126,7 +126,22 @@ class CTRGraphs:
             labelpad=12
         )
 
-        self.ax_plots.set_ylim([0, 120])
+        # self.ax_plots.set_ylim([0, 120])
+
+        # 1. On regroupe toutes les valeurs pour trouver le min et le max réels
+        min_y = np.min([orient_X, orient_Y, orient_Z])
+        max_y = np.max([orient_X, orient_Y, orient_Z])
+        
+        # 2. On calcule une marge de 5% pour que les courbes ne collent pas aux bords
+        margin = 0.05 * (max_y - min_y)
+        if margin < 5.0: 
+            margin = 5.0 # Marge minimale de 5 degrés si le robot bouge peu
+
+        # 3. On applique les limites en sécurisant pour ne pas dépasser les limites physiques [0, 180]
+        self.ax_plots.set_ylim(
+            max(0, min_y - margin), 
+            min(180, max_y + margin)
+        )
 
     def plot_twist_distribution(
         self,
@@ -157,16 +172,23 @@ class CTRGraphs:
         self.ax_plots.axvline(x=l_transition1, color='orange', linestyle='--', alpha=0.7, label="End T3 (Ext)")
         self.ax_plots.axvline(x=l_transition2, color='purple', linestyle='--', alpha=0.7, label="End T2 (Mid)")
 
+
         # Zones de précourbure
         # Zone de précourbure Tube 3 (Externe)
         start_curve_t3 = l_transition1 - self.l_kappa
         if start_curve_t3 >= 0:
-            self.ax_plots.axvline(x=start_curve_t3,color='darkorange', linestyle=':', linewidth=2.5, label=r"Start curve T3")
+            # AJOUT : Partie DROITE du Tube 3 (Foncée)
+            self.ax_plots.axvspan(0, start_curve_t3, color='darkorange', alpha=0.12, zorder=1)
+            
+            self.ax_plots.axvline(x=start_curve_t3,color='orange', linestyle=':', linewidth=2.5, label=r"Start curve T3")
             self.ax_plots.axvspan(start_curve_t3, l_transition1, color='orange', alpha=0.07, zorder=1)
 
         # Zone de précourbure Tube 2 (Intermédiaire)
         start_curve_t2 = l_transition2 - self.l_kappa
         if start_curve_t2 >= 0:
+            # AJOUT : Partie DROITE du Tube 2 (Foncée)
+            self.ax_plots.axvspan(0, start_curve_t2, color='indigo', alpha=0.08, zorder=1)
+            
             self.ax_plots.axvline(x=start_curve_t2, color='purple', linestyle=':', linewidth=2.5, label=r"Start curve T2")
             self.ax_plots.axvspan(start_curve_t2, l_transition2, color='purple', alpha=0.04, zorder=1)
 
@@ -174,10 +196,36 @@ class CTRGraphs:
         l_end_t1 = data.length_axis[-1]
         start_curve_t1 = l_end_t1 - self.l_kappa
         if start_curve_t1 >= 0:
+            # AJOUT : Partie DROITE du Tube 1 (Foncée)
+            self.ax_plots.axvspan(0, start_curve_t1, color='darkgreen', alpha=0.06, zorder=1)
+            
             self.ax_plots.axvline(x=start_curve_t1, color='green', linestyle=':', linewidth=2.5, label=r"Start curve T1 (Int)")
             self.ax_plots.axvspan(start_curve_t1, l_end_t1, color='green', alpha=0.03, zorder=1)
             # Ligne de fin désormais visible grâce à la marge de 5%
             self.ax_plots.axvline(x=l_end_t1, color='green', linestyle='--', alpha=0.7, label="End T1 (Tip)")
+
+
+        # # Zones de précourbure
+        # # Zone de précourbure Tube 3 (Externe)
+        # start_curve_t3 = l_transition1 - self.l_kappa
+        # if start_curve_t3 >= 0:
+        #     self.ax_plots.axvline(x=start_curve_t3,color='darkorange', linestyle=':', linewidth=2.5, label=r"Start curve T3")
+        #     self.ax_plots.axvspan(start_curve_t3, l_transition1, color='orange', alpha=0.07, zorder=1)
+
+        # # Zone de précourbure Tube 2 (Intermédiaire)
+        # start_curve_t2 = l_transition2 - self.l_kappa
+        # if start_curve_t2 >= 0:
+        #     self.ax_plots.axvline(x=start_curve_t2, color='purple', linestyle=':', linewidth=2.5, label=r"Start curve T2")
+        #     self.ax_plots.axvspan(start_curve_t2, l_transition2, color='purple', alpha=0.04, zorder=1)
+
+        # # Zone de précourbure Tube 1 (Interne)
+        # l_end_t1 = data.length_axis[-1]
+        # start_curve_t1 = l_end_t1 - self.l_kappa
+        # if start_curve_t1 >= 0:
+        #     self.ax_plots.axvline(x=start_curve_t1, color='green', linestyle=':', linewidth=2.5, label=r"Start curve T1 (Int)")
+        #     self.ax_plots.axvspan(start_curve_t1, l_end_t1, color='green', alpha=0.03, zorder=1)
+        #     # Ligne de fin désormais visible grâce à la marge de 5%
+        #     self.ax_plots.axvline(x=l_end_t1, color='green', linestyle='--', alpha=0.7, label="End T1 (Tip)")
 
 
         self.ax_plots.set_title("Angles de torsion des tubes le long du CTR", fontsize=11, fontweight='bold')

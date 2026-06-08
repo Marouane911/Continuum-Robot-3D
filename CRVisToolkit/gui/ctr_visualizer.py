@@ -32,7 +32,7 @@ class CTRVisualizer:
             y[end_ext - 1:end_mid],
             z[end_ext - 1:end_mid],
             linewidth=(2 * r_tube[1]) * scale * 2,
-            color="green",
+            color="blue",
             solid_capstyle="butt" # Coupe nette des extrémités
         )
 
@@ -42,7 +42,7 @@ class CTRVisualizer:
             y[end_mid - 1:end_int],
             z[end_mid - 1:end_int],
             linewidth=(2 * r_tube[0]) * scale,
-            color="blue",
+            color='#08ff08',
             solid_capstyle="butt" # Coupe nette des extrémités
         )
         
@@ -53,6 +53,23 @@ class CTRVisualizer:
             z[-1],
             s=40
         )
+
+        # === MULTI-MODIFICATION : FIXATION DES AXES (GRILLE STATIQUE) ===
+        # Les dimensions sont ici exprimées en MÈTRES (car axis_len = 0.03 soit 3 cm)
+        
+        XY_BOITE = 0.08   # Largeur du cadre (gère l'amplitude gauche/droite à +/- 8 cm)
+        Z_MIN_BOITE = -0.15 # Profondeur max pour voir les chariots descendre (ici -15 cm)
+        Z_MAX_BOITE = 0.35  # Hauteur max du graphique (ici 35 cm)
+
+        # On applique les limites strictes à la caméra
+        self.ax_robot.set_xlim([-XY_BOITE, XY_BOITE])
+        self.ax_robot.set_ylim([-XY_BOITE, XY_BOITE])
+        self.ax_robot.set_zlim([Z_MIN_BOITE, Z_MAX_BOITE])
+
+        # On force un aspect visuel proportionnel (Évite que le robot soit aplati ou étiré)
+        hauteur_totale = Z_MAX_BOITE - Z_MIN_BOITE
+        largeur_totale = 2 * XY_BOITE
+        self.ax_robot.set_box_aspect((1, 1, hauteur_totale / largeur_totale))
     
 
     def draw_chariots(self, q_values):
@@ -165,7 +182,9 @@ class CTRVisualizer:
             gz[:g_ext],
             color="cyan",
             alpha=0.25,
-            linewidth=(2 * r_tube[2]) * scale * 3
+            linewidth=(2 * r_tube[2]) * scale * 3,
+            solid_capstyle="butt" # Coupe nette des extrémités
+
         )
 
         self.ax_robot.plot(
@@ -174,7 +193,8 @@ class CTRVisualizer:
             gz[g_ext - 1:g_mid],
             color="cyan",
             alpha=0.25,
-            linewidth=(2 * r_tube[1]) * scale * 2
+            linewidth=(2 * r_tube[1]) * scale * 2,
+            solid_capstyle="butt" # Coupe nette des extrémités
         )
 
         self.ax_robot.plot(
@@ -183,5 +203,6 @@ class CTRVisualizer:
             gz[g_mid - 1:g_int],
             color="cyan",
             alpha=0.25,
-            linewidth=(2 * r_tube[0]) * scale
+            linewidth=(2 * r_tube[0]) * scale,
+            solid_capstyle="butt" # Coupe nette des extrémités
         )
