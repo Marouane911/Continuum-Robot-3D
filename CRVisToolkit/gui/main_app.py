@@ -44,6 +44,10 @@ class MainApp(QMainWindow):
         self.setWindowTitle("CTR VISUALIZATION TOOL")
         self.setGeometry(100, 100, 1400, 900)
 
+        # Sécurité
+        self.l_kappa_tubes = [0.05, 0.05, 0.05]
+        self.l_tubes = [0.4630, 0.3305, 0.1990]
+
         # gestion de la modification des parameters
         # RECONSTRUCTION DU CHEMIN ABSOLU VERS LE REPO DE QUENTIN 
         project_parent = os.path.dirname(root_toolkit)
@@ -157,7 +161,6 @@ class MainApp(QMainWindow):
         self.compute_ctr_configuration(self.current_q)
 
         self.set_current_as_home()
-
 
 
 
@@ -424,7 +427,7 @@ class MainApp(QMainWindow):
             if i < 3:
 
                 spinbox.setRange(
-                    -0.40,
+                    -0.50, ### HERE
                     0.05
                 )
 
@@ -492,6 +495,15 @@ class MainApp(QMainWindow):
 
         config_layout.addWidget(
             self.auto_apply_checkbox
+        )
+
+        self.entrainement_checkbox = QCheckBox(
+            "Activer entraînement des chariots"
+        )
+
+        self.entrainement_checkbox.setChecked(True)  # Décoché par défaut
+        config_layout.addWidget(
+            self.entrainement_checkbox
         )
 
         self.tip_path_checkbox = QCheckBox(
@@ -604,22 +616,39 @@ class MainApp(QMainWindow):
             self.graph_selector
         )
 
-        self.btn_save_img = QPushButton(
-            "Sauvegarder l'image"
-        )
+        # Boutons d'export
 
-        self.btn_save_img.setStyleSheet("""
-            background-color:#2196F3;
-            color:white;
-        """)
+        btn_exp_ctr = QPushButton("Exporter CTR (3D)")
+        btn_exp_ctr.setStyleSheet("background-color:#4CAF50; color:white;")
+        btn_exp_ctr.clicked.connect(lambda: self.export_svg("ctr"))
+        graph_layout.addWidget(btn_exp_ctr)
 
-        self.btn_save_img.clicked.connect(
-            self.save_plot
-        )
+        btn_exp_graph = QPushButton("Exporter Graph (2D)")
+        btn_exp_graph.setStyleSheet("background-color:#4CAF50; color:white;")
+        btn_exp_graph.clicked.connect(lambda: self.export_svg("graph"))
+        graph_layout.addWidget(btn_exp_graph)
 
-        graph_layout.addWidget(
-            self.btn_save_img
-        )
+        btn_exp_all = QPushButton("Exporter Tout")
+        btn_exp_all.setStyleSheet("background-color:#2196F3; color:white;")
+        btn_exp_all.clicked.connect(lambda: self.export_svg("all"))
+        graph_layout.addWidget(btn_exp_all)
+
+        # self.btn_save_img = QPushButton(
+        #     "Sauvegarder l'image"
+        # )
+
+        # self.btn_save_img.setStyleSheet("""
+        #     background-color:#2196F3;
+        #     color:white;
+        # """)
+
+        # self.btn_save_img.clicked.connect(
+        #     self.save_plot
+        # )
+
+        # graph_layout.addWidget(
+        #     self.btn_save_img
+        # )
 
         graph_group.setLayout(
             graph_layout
@@ -686,15 +715,18 @@ class MainApp(QMainWindow):
         params_layout = QGridLayout()
 
         self.param_inputs = {}
-        keys = ['Ux1', 'Ux2', 'Ux3', 'l1', 'l2', 'l3']
+        keys = ['Ux1', 'Ux2', 'Ux3', 'l1', 'l2', 'l3','l_k1', 'l_k2', 'l_k3']
 
         display_names = {
-            'Ux1': "Courbure Tube 1",
-            'Ux2': "Courbure Tube 2",
-            'Ux3': "Courbure Tube 3",
-            'l1': "Longueur Totale Tube 1",
-            'l2': "Longueur Totale Tube 2",
-            'l3': "Longueur Totale Tube 3"
+            'Ux1': "Courbure tube 1",
+            'Ux2': "Courbure tube 2",
+            'Ux3': "Courbure tube 3",
+            'l1': "Longueur totale tube 1",
+            'l2': "Longueur totale tube 2",
+            'l3': "Longueur totale tube 3",
+            'l_k1' : "Longueur courbée tube 1",
+            'l_k2' : "Longueur courbée tube 2",
+            'l_k3' : "Longueur courbée tube 3"
         }
         
         # --- LECTURE DES VALEURS ACTUELLES DU CSV ---
@@ -726,13 +758,54 @@ class MainApp(QMainWindow):
         btn_save_params = QPushButton("Enregistrer et Appliquer")
         btn_save_params.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;")
         btn_save_params.clicked.connect(self.save_parameters_to_csv)
-        params_layout.addWidget(btn_save_params, 6, 0, 1, 2)
+        params_layout.addWidget(btn_save_params, len(keys), 0, 1, 2)
         
         params_group.setLayout(params_layout)
         control_layout.addWidget(params_group)
 
+        for key in ["l1", "l2", "l3"]:
+            self.param_inputs[key].valueChanged.connect(
+                self.update_translation_limits
+            )
 
+        self.update_translation_limits() # Limites des plages de valeurs de transitions des tubes
 
+    def update_translation_limits(self):
+
+        print("update_translation_limits appelée")
+
+        l_tubes = [
+            self.param_inputs["l1"].value(),
+            self.param_inputs["l2"].value(),
+            self.param_inputs["l3"].value()
+        ]
+
+        for i in range(3):
+
+            self.q_inputs[i].setRange(
+                -l_tubes[i],
+                0.0
+            )
+
+            # sécurité : empêcher qu'une valeur déjà présente dans la spinbox devienne invalide après avoir changé les limites
+            if self.q_inputs[i].value() < -l_tubes[i]:
+                self.q_inputs[i].setValue(-l_tubes[i])
+
+    def get_l_kappa_tubes(self):
+        return [
+            self.param_inputs["l_k1"].value(),
+            self.param_inputs["l_k2"].value(),
+            self.param_inputs["l_k3"].value()
+        ]
+        
+    def get_l_tubes(self):
+        return [
+            self.param_inputs["l1"].value(),
+            self.param_inputs["l2"].value(),
+            self.param_inputs["l3"].value()
+        ]
+
+    
     def save_parameters_to_csv(self):
             print("=== SAUVEGARDE ===")
             print("Fichier :", self.temp_params_path)
@@ -756,8 +829,11 @@ class MainApp(QMainWindow):
                 writer = csv.DictWriter(f, fieldnames=reader[0].keys())
                 writer.writeheader()
                 writer.writerows(reader)
-                                            
-            # 4. RECALCUL IMMÉDIAT : Le solver va maintenant lire les vraies nouvelles valeurs
+
+            # 4. MISE À JOUR DES L_KAPPA
+            self.l_kappa_tubes = self.get_l_kappa_tubes()
+
+            # 5. RECALCUL IMMÉDIAT : Le solver va maintenant lire les vraies nouvelles valeurs
             q_values = [self.q_inputs[i].value() for i in range(6)]
             self.compute_ctr_configuration(q_values)
             
@@ -796,7 +872,7 @@ class MainApp(QMainWindow):
             step = self.steps_data[self.current_step]
                 
             try:
-                data = CTRData(step["matrix"], step["iEnd"], step["S"])
+                data = CTRData(step["matrix"], step["iEnd"], step["S"],)
 
                 self.ghost_robot = {
                     "x": data.x.copy(),
@@ -829,6 +905,12 @@ class MainApp(QMainWindow):
 
         self.active_actuator = active_index
 
+        current_lengths = [
+            self.param_inputs['l1'].value(),
+            self.param_inputs['l2'].value(),
+            self.param_inputs['l3'].value()
+        ]
+
         if self.auto_apply_checkbox.isChecked():
 
             q_values = [
@@ -838,7 +920,9 @@ class MainApp(QMainWindow):
 
             q_values = CTRConstraints.enforce_telescopic_constraints(
                 q_values,
-                active_index
+                active_index,
+                entrainement=self.entrainement_checkbox.isChecked(),
+                tubes_lengths=current_lengths
             )
 
             for i in range(6):
@@ -862,10 +946,18 @@ class MainApp(QMainWindow):
                 "active_actuator",
                 0
         )
+
+        current_lengths = [
+            self.param_inputs['l1'].value(),
+            self.param_inputs['l2'].value(),
+            self.param_inputs['l3'].value()
+        ]
         
         q_values = CTRConstraints.enforce_telescopic_constraints(
             q_values,
-            active
+            active,
+            entrainement=self.entrainement_checkbox.isChecked(),
+            tubes_lengths=current_lengths
         )
 
         for i in range(6):
@@ -877,44 +969,79 @@ class MainApp(QMainWindow):
             q_values
         )
 
-    
-    def save_plot(self):
 
-        file_path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Sauvegarder la fenêtre",
-            "ctr_visualization.png",
-            "PNG Image (*.png);;JPEG Image (*.jpg *.jpeg)"
-        )
-
-        if not file_path:
-            return
-
-        try:
-
-            # Capture de toute la fenêtre
-            pixmap = self.grab()
-            pixmap = pixmap.scaled(
-                pixmap.width() * 2,
-                pixmap.height() * 2,
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
+    def export_svg(self, target="all"):
+            """
+            Export au format vectoriel réel.
+            target: 'all' (toute la figure), 'ctr' (3D), 'graph' (2D)
+            """
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "Exporter en SVG", "", "SVG Vectoriel (*.svg)"
             )
-            pixmap.save(file_path)
+            
+            if not file_path: return
+            if not file_path.endswith(".svg"): file_path += ".svg"
 
-            QMessageBox.information(
-                self,
-                "Sauvegarde réussie",
-                f"La fenêtre complète a été enregistrée.\n\n{file_path}"
-            )
+            # 1. Sauvegarde de l'état de visibilité actuel
+            vis_robot = self.ax_robot.get_visible()
+            vis_plots = self.ax_plots.get_visible()
 
-        except Exception as e:
+            # 2. On masque ce qu'on ne veut pas
+            if target == "ctr":
+                self.ax_plots.set_visible(False)
+            elif target == "graph":
+                self.ax_robot.set_visible(False)
 
-            QMessageBox.critical(
-                self,
-                "Erreur",
-                str(e)
-            )
+            # 3. Export via Matplotlib (Vecteurs réels)
+            try:
+                self.fig.savefig(file_path, format='svg', bbox_inches='tight')
+                QMessageBox.information(self, "Succès", f"Export SVG réussi :\n{file_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Erreur", f"Échec export : {str(e)}")
+            finally:
+                # 4. On rétablit la visibilité
+                self.ax_robot.set_visible(vis_robot)
+                self.ax_plots.set_visible(vis_plots)
+                self.canvas.draw()
+                
+
+    # def save_plot(self):
+
+    #     file_path, _ = QFileDialog.getSaveFileName(
+    #         self,
+    #         "Exporter CTR",
+    #         "ctr_visualization.svg",
+    #         "SVG Vectoriel (*.svg)"
+    #     )
+        
+    #     if not file_path.endswith(".svg"):
+    #         file_path += ".svg"
+
+    #     try:
+
+    #         # Capture de toute la fenêtre
+    #         pixmap = self.grab()
+    #         pixmap = pixmap.scaled(
+    #             pixmap.width() * 2,
+    #             pixmap.height() * 2,
+    #             Qt.KeepAspectRatio,
+    #             Qt.SmoothTransformation
+    #         )
+    #         pixmap.save(file_path)
+
+    #         QMessageBox.information(
+    #             self,
+    #             "Sauvegarde réussie",
+    #             f"La fenêtre complète a été enregistrée.\n\n{file_path}"
+    #         )
+
+    #     except Exception as e:
+
+    #         QMessageBox.critical(
+    #             self,
+    #             "Erreur",
+    #             str(e)
+    #         )
 
     def compute_ctr_configuration(
         self,
@@ -1051,7 +1178,7 @@ class MainApp(QMainWindow):
         data = CTRData(
             step["matrix"],
             step["iEnd"],
-            step["S"]
+            step["S"],
         )
 
         matrix_data = data.matrix_data
@@ -1093,6 +1220,8 @@ class MainApp(QMainWindow):
 
 
         # RENDU DU ROBOT 3D
+        l_kappa_tubes = self.get_l_kappa_tubes()
+        l_tubes = self.get_l_tubes()
 
         self.visualizer.draw_robot(
             x,
@@ -1101,7 +1230,11 @@ class MainApp(QMainWindow):
             end_ext,
             end_mid,
             end_int,
-            self.r_tube
+            self.r_tube,
+            l_kappa_tubes,
+            l_tubes,
+            length_axis,
+            q_current
         )
 
         # Trajectoire historique de la pointe
@@ -1356,7 +1489,7 @@ class MainApp(QMainWindow):
                 )
             
             # Décoration minimale de l'axe
-            ax_chariots.set_xlim(-400, 50) # Plage fixe pour ne pas que l'échelle bouge
+            ax_chariots.set_xlim(-(l_tubes[0]+0.005)*1000, 50) # Plage en fonction de la longueur du tube interne pour pouvoir le rentrer jusqu'à une heuteur epsilon
             ax_chariots.set_ylim(-1, 1)
             
             # Masquer complètement l'axe Y et affiner l'axe X

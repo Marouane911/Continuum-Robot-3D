@@ -169,8 +169,8 @@ class CTRGraphs:
         l_transition1 = data.length_axis[data.end_ext - 1]
         l_transition2 = data.length_axis[data.end_mid - 1]
 
-        self.ax_plots.axvline(x=l_transition1, color='orange', linestyle='--', alpha=0.7, label="End T3 (Ext)")
-        self.ax_plots.axvline(x=l_transition2, color='purple', linestyle='--', alpha=0.7, label="End T2 (Mid)")
+        self.ax_plots.axvline(x=l_transition1, color='red', linestyle='--', alpha=0.7, label="End T3 (Ext)")
+        self.ax_plots.axvline(x=l_transition2, color='blue', linestyle='--', alpha=0.7, label="End T2 (Mid)")
 
 
         # Zones de précourbure
@@ -178,29 +178,26 @@ class CTRGraphs:
         start_curve_t3 = l_transition1 - self.l_kappa
         if start_curve_t3 >= 0:
             # AJOUT : Partie DROITE du Tube 3 (Foncée)
-            self.ax_plots.axvspan(0, start_curve_t3, color='darkorange', alpha=0.12, zorder=1)
-            
-            self.ax_plots.axvline(x=start_curve_t3,color='orange', linestyle=':', linewidth=2.5, label=r"Start curve T3")
-            self.ax_plots.axvspan(start_curve_t3, l_transition1, color='orange', alpha=0.07, zorder=1)
+            self.ax_plots.axvspan(0, start_curve_t3, color='orange', alpha=0.12, zorder=1)
+            self.ax_plots.axvline(x=start_curve_t3,color='red', linestyle=':', linewidth=2.5, label=r"Start curve T3")
+            self.ax_plots.axvspan(start_curve_t3, l_transition1, color='red', alpha=0.07, zorder=1)
 
         # Zone de précourbure Tube 2 (Intermédiaire)
         start_curve_t2 = l_transition2 - self.l_kappa
         if start_curve_t2 >= 0:
             # AJOUT : Partie DROITE du Tube 2 (Foncée)
-            self.ax_plots.axvspan(0, start_curve_t2, color='indigo', alpha=0.08, zorder=1)
-            
-            self.ax_plots.axvline(x=start_curve_t2, color='purple', linestyle=':', linewidth=2.5, label=r"Start curve T2")
-            self.ax_plots.axvspan(start_curve_t2, l_transition2, color='purple', alpha=0.04, zorder=1)
+            self.ax_plots.axvspan(0, start_curve_t2, color='purple', alpha=0.08, zorder=1)
+            self.ax_plots.axvline(x=start_curve_t2, color='blue', linestyle=':', linewidth=2.5, label=r"Start curve T2")
+            self.ax_plots.axvspan(start_curve_t2, l_transition2, color='blue', alpha=0.04, zorder=1)
 
         # Zone de précourbure Tube 1 (Interne)
         l_end_t1 = data.length_axis[-1]
         start_curve_t1 = l_end_t1 - self.l_kappa
         if start_curve_t1 >= 0:
             # AJOUT : Partie DROITE du Tube 1 (Foncée)
-            self.ax_plots.axvspan(0, start_curve_t1, color='darkgreen', alpha=0.06, zorder=1)
-            
+            self.ax_plots.axvspan(0, start_curve_t1, color='yellow', alpha=0.06, zorder=1)
             self.ax_plots.axvline(x=start_curve_t1, color='green', linestyle=':', linewidth=2.5, label=r"Start curve T1 (Int)")
-            self.ax_plots.axvspan(start_curve_t1, l_end_t1, color='green', alpha=0.03, zorder=1)
+            self.ax_plots.axvspan(start_curve_t1, l_end_t1, color='black', alpha=0.03, zorder=1)
             # Ligne de fin désormais visible grâce à la marge de 5%
             self.ax_plots.axvline(x=l_end_t1, color='green', linestyle='--', alpha=0.7, label="End T1 (Tip)")
 

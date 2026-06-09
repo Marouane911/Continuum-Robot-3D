@@ -1,3 +1,5 @@
+import numpy as np
+
 class CTRVisualizer:
 
     def __init__(self, ax_robot):
@@ -11,41 +13,107 @@ class CTRVisualizer:
         end_ext,
         end_mid,
         end_int,
-        r_tube
+        r_tube,
+        l_kappa_tubes,
+        l_tubes,
+        length_axis,
+        q # translations
     ):
-
         scale = 1000
+        print(l_kappa_tubes)
+        print(f"DEBUG: end_ext={end_ext}, end_mid={end_mid}, end_int={end_int}")
+        print(f"Tailles segments : Ext={end_ext}, Mid={end_mid-end_ext}, Int={end_int-end_mid}")
 
-        # Tube externe (Zone à 3 tubes)
-        self.ax_robot.plot(
-            x[:end_ext],
-            y[:end_ext],
-            z[:end_ext],
-            linewidth=(2 * r_tube[2]) * scale * 3,
-            color="red",
-            solid_capstyle="butt" # Coupe nette des extrémités
-        )
+        # tube 3 : externe (Zone de la base à end_ext)
+        x3 = x[:end_ext]
+        y3 = y[:end_ext]
+        z3 = z[:end_ext]
 
-        # Tube intermédiaire (Zone à 2 tubes)
-        self.ax_robot.plot(
-            x[end_ext - 1:end_mid],
-            y[end_ext - 1:end_mid],
-            z[end_ext - 1:end_mid],
-            linewidth=(2 * r_tube[1]) * scale * 2,
-            color="blue",
-            solid_capstyle="butt" # Coupe nette des extrémités
-        )
+        # 1. Trouver la position globale de la pointe du tube 3
+        pos_pointe_3 = length_axis[end_ext - 1]
+        # 2. Soustraire la longueur courbée pour trouver le début de la courbure
+        pos_debut_courbure_3 = pos_pointe_3 - l_kappa_tubes[2]
+        # 3. Trouver l'index global le plus proche de cette position
+        idx_global_3 = np.argmin(np.abs(length_axis - pos_debut_courbure_3))
+        # 4. Pour le tube 3, l'index local est égal à l'index global
+        idx_local_3 = idx_global_3
+        # 5. Sécurité pour ne pas déborder du segment
+        if idx_local_3 < 0: idx_local_3 = 0
+        if idx_local_3 > len(x3): idx_local_3 = len(x3)
 
-        # Tube interne (Zone à 1 tube / Pointe)
+        # Dessin Tube 3
         self.ax_robot.plot(
-            x[end_mid - 1:end_int],
-            y[end_mid - 1:end_int],
-            z[end_mid - 1:end_int],
-            linewidth=(2 * r_tube[0]) * scale,
-            color='#08ff08',
-            solid_capstyle="butt" # Coupe nette des extrémités
-        )
-        
+            x3[:idx_local_3],
+            y3[:idx_local_3],
+            z3[:idx_local_3],
+            linewidth=(2 * r_tube[2]) * scale * 3, color="#ff0000")
+        self.ax_robot.plot(
+            x3[idx_local_3:],
+            y3[idx_local_3:],
+            z3[idx_local_3:],
+            linewidth=(2 * r_tube[2]) * scale * 3, color="#8c0000")
+
+
+        # tube 2 : intermédiaire (Zone de end_ext à end_mid)
+        x2 = x[end_ext:end_mid]
+        y2 = y[end_ext:end_mid]
+        z2 = z[end_ext:end_mid]
+
+        # 1. Trouver la position globale de la pointe du tube 2
+        pos_pointe_2 = length_axis[end_mid - 1]
+        # 2. Soustraire la longueur courbée
+        pos_debut_courbure_2 = pos_pointe_2 - l_kappa_tubes[1]
+        # 3. Trouver l'index global
+        idx_global_2 = np.argmin(np.abs(length_axis - pos_debut_courbure_2))
+        # 4. Convertir en index LOCAL (on soustrait le décalage du début du segment)
+        idx_local_2 = idx_global_2 - end_ext
+        # 5. Sécurité : si la courbure a commencé avant (dans la zone 3), idx_local sera négatif -> on le force à 0
+        if idx_local_2 < 0: idx_local_2 = 0
+        if idx_local_2 > len(x2): idx_local_2 = len(x2)
+
+        # Dessin Tube 2
+        self.ax_robot.plot(
+            x2[:idx_local_2],
+            y2[:idx_local_2],
+            z2[:idx_local_2],
+            linewidth=(2 * r_tube[1]) * scale * 2, color="#00f2ff")
+        self.ax_robot.plot(
+            x2[idx_local_2:],
+            y2[idx_local_2:],
+            z2[idx_local_2:],
+            linewidth=(2 * r_tube[1]) * scale * 2, color="#00a2ab")
+
+
+        # tube 1 : interne (Zone de end_mid à end_int)
+        x1 = x[end_mid:end_int]
+        y1 = y[end_mid:end_int]
+        z1 = z[end_mid:end_int]
+
+        # 1. Trouver la position globale de la pointe du tube 1
+        pos_pointe_1 = length_axis[end_int - 1]
+        # 2. Soustraire la longueur courbée
+        pos_debut_courbure_1 = pos_pointe_1 - l_kappa_tubes[0]
+        # 3. Trouver l'index global
+        idx_global_1 = np.argmin(np.abs(length_axis - pos_debut_courbure_1))
+        # 4. Convertir en index LOCAL (on soustrait le décalage du début du segment)
+        idx_local_1 = idx_global_1 - end_mid
+        # 5. Sécurité
+        if idx_local_1 < 0: idx_local_1 = 0
+        if idx_local_1 > len(x1): idx_local_1 = len(x1)
+
+        # Dessin Tube 1
+        self.ax_robot.plot(
+            x1[:idx_local_1],
+            y1[:idx_local_1],
+            z1[:idx_local_1],
+            linewidth=(2 * r_tube[0]) * scale, color='#33ff00')
+        self.ax_robot.plot(
+            x1[idx_local_1:],
+            y1[idx_local_1:],
+            z1[idx_local_1:],
+            linewidth=(2 * r_tube[0]) * scale, color='#1e9600')
+
+
         # Pointe
         self.ax_robot.scatter(
             x[-1],
