@@ -5,6 +5,7 @@ import subprocess
 import shutil
 import csv
  
+from PyQt5.QtCore import Qt, QLocale
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QGridLayout,
@@ -13,9 +14,12 @@ from PyQt5.QtWidgets import (
     QFileDialog, QMessageBox,
     QGroupBox, QScrollArea
 )
-from PyQt5.QtCore import Qt, QLocale
+
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+import matplotlib.gridspec as gridspec
+from PIL import Image
+
 from ctr_data import CTRData
 from ctr_visualizer import CTRVisualizer
 from ctr_graph import CTRGraphs
@@ -55,7 +59,7 @@ class MainApp(QMainWindow):
 
 
 
-# GESTION DES PARAMÈTRES (COPIE PARFAITE DANS parameters_temp.csv)
+        # GESTION DES PARAMÈTRES (COPIE PARFAITE DANS parameters_temp.csv)
         self.params_path = os.path.join(
             project_parent,
             "Modeling-and-Control-of-Concentric-Tube-Continuum-Robots",
@@ -90,10 +94,10 @@ class MainApp(QMainWindow):
         self.steps_data = []
         self.current_step = 0
 
-        # Rayons externes exacts issus de parameters.csv (rOut1, rOut2, rOut3)
+        # Rayons des tubes depuis parameters.csv (rOut1, rOut2, rOut3)
         self.r_tube = np.array([0.000762, 0.0009, 0.001175])
 
-        # Définition de la longueur de précourbure (50 mm d'après le csv)
+        # Définition de la longueur de précourbure (50 mm, look csv)
         self.l_kappa = 0.05
 
         self.steps_data = CTRLoader.load(
@@ -161,6 +165,8 @@ class MainApp(QMainWindow):
         self.compute_ctr_configuration(self.current_q)
 
         self.set_current_as_home()
+        # Gestion de l'affichage robot et/ou graph
+        self.show_graphs = True  # Par défaut, on affiche tout
 
 
 
@@ -382,7 +388,7 @@ class MainApp(QMainWindow):
         # ==========================================================
 
         actuators_group = QGroupBox(
-            "Actionneurs CTR"
+            "Actionneurs"
         )
 
         actuators_layout = QGridLayout()
@@ -483,43 +489,10 @@ class MainApp(QMainWindow):
         # CONFIGURATION
         # ==========================================================
 
-        config_group = QGroupBox(
-            "Configuration"
-        )
-
+        # Start of panel
+        config_group = QGroupBox("Configuration")
         config_layout = QVBoxLayout()
-
-        self.auto_apply_checkbox = QCheckBox(
-            "Appliquer en temps réel"
-        )
-
-        config_layout.addWidget(
-            self.auto_apply_checkbox
-        )
-
-        self.entrainement_checkbox = QCheckBox(
-            "Activer entraînement des chariots"
-        )
-
-        self.entrainement_checkbox.setChecked(True)  # Décoché par défaut
-        config_layout.addWidget(
-            self.entrainement_checkbox
-        )
-
-        self.tip_path_checkbox = QCheckBox(
-            "Afficher trajectoire pointe"
-        )
-
-        self.tip_path_checkbox.setChecked(True)
-
-        self.tip_path_checkbox.toggled.connect(
-            self.update_plots
-        )
-
-        control_layout.addWidget(
-            self.tip_path_checkbox
-        )
-
+        
         config_layout.addWidget(
             QLabel("Nombre d'étapes")
         )
@@ -528,7 +501,7 @@ class MainApp(QMainWindow):
 
         self.steps_spinbox.setRange(
             1,
-            500
+            100
         )
 
         self.steps_spinbox.setValue(
@@ -557,6 +530,39 @@ class MainApp(QMainWindow):
             self.btn_apply
         )
 
+        self.auto_apply_checkbox = QCheckBox(
+            "Appliquer en temps réel"
+        )
+
+        config_layout.addWidget(
+            self.auto_apply_checkbox
+        )
+
+        self.entrainement_checkbox = QCheckBox(
+            "Activer l'entraînement des chariots"
+        )
+
+        self.entrainement_checkbox.setChecked(True)  # Décoché par défaut
+        config_layout.addWidget(
+            self.entrainement_checkbox
+        )
+
+        self.tip_path_checkbox = QCheckBox(
+            "Afficher la trajectoire de l'organe terminal"
+        )
+
+
+        self.tip_path_checkbox.setChecked(True)
+
+        self.tip_path_checkbox.toggled.connect(
+            self.update_plots
+        )
+
+        config_layout.addWidget(
+            self.tip_path_checkbox
+        )
+
+
 
         # Affichage des chariots du ghost robot
         self.ghost_checkbox = QCheckBox(
@@ -574,7 +580,7 @@ class MainApp(QMainWindow):
         # Affichage des chariots
 
         self.chariots_checkbox = QCheckBox(
-            "Afficher les chariots (Base)"
+            "Afficher les chariots"
         )
         self.chariots_checkbox.setChecked(False)
         self.chariots_checkbox.toggled.connect(
@@ -582,6 +588,23 @@ class MainApp(QMainWindow):
         )
         config_layout.addWidget(self.chariots_checkbox)
 
+        # Affichage robot seul
+        self.robot_only_checkbox = QCheckBox("Mode Robot Seul (Plein Écran)")
+        self.robot_only_checkbox.stateChanged.connect(self.update_plots)
+        config_layout.addWidget(self.robot_only_checkbox)
+
+
+        # Enregistrement GIF du mouvement lorsqu'on appuis sur "appliquer configuration"
+        self.record_gif_checkbox = QCheckBox(
+            "Enregistrer l'animation (GIF)"
+        )
+        self.record_gif_checkbox.setStyleSheet("color: #D32F2F; font-weight: bold;")
+        config_layout.addWidget(
+            self.record_gif_checkbox
+        )
+
+
+        # End of panel
         config_group.setLayout(
             config_layout
         )
@@ -595,7 +618,7 @@ class MainApp(QMainWindow):
         # ==========================================================
 
         graph_group = QGroupBox(
-            "Graphiques"
+            "Graphiques et exports"
         )
 
         graph_layout = QVBoxLayout()
@@ -770,6 +793,24 @@ class MainApp(QMainWindow):
 
         self.update_translation_limits() # Limites des plages de valeurs de transitions des tubes
 
+
+
+    def toggle_view_mode(self):
+        self.show_graphs = not self.show_graphs
+        
+        # Gérer la visibilité des graphiques (via ton module ctr_graph)
+        # Prendre en compte l'option qui gère le widget graphique
+        self.graph_widget.setVisible(self.show_graphs)
+        
+        # 2. Force la mise à jour de l'affichage
+        self.update_plots()
+        
+        # 3. Ajustement du layout (Optionnel mais recommandé)
+        # Si le graphique est caché, il faut dire au layout de s'étendre
+        # Cela dépend si tu utilises des layouts Qt ou des Grids Matplotlib
+        # ex: self.layout.activate()
+
+        
     def update_translation_limits(self):
 
         print("update_translation_limits appelée")
@@ -783,7 +824,7 @@ class MainApp(QMainWindow):
         for i in range(3):
 
             self.q_inputs[i].setRange(
-                -l_tubes[i],
+                -l_tubes[i]+0.015,
                 0.0
             )
 
@@ -843,13 +884,9 @@ class MainApp(QMainWindow):
 
         for i in range(6):
             
-            self.q_inputs[i].blockSignals(True) # signaux
-
-            self.q_inputs[i].setValue(
-                self.last_valid_q[i]
-            )
-            
-            self.q_inputs[i].blockSignals(False) # signaux
+            self.q_inputs[i].blockSignals(True) # signaux bloqué
+            self.q_inputs[i].setValue(self.last_valid_q[i])
+            self.q_inputs[i].blockSignals(False) # signaux débloqué
 
         self.compute_ctr_configuration(
             self.last_valid_q
@@ -971,10 +1008,7 @@ class MainApp(QMainWindow):
 
 
     def export_svg(self, target="all"):
-            """
-            Export au format vectoriel réel.
-            target: 'all' (toute la figure), 'ctr' (3D), 'graph' (2D)
-            """
+
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "Exporter en SVG", "", "SVG Vectoriel (*.svg)"
             )
@@ -982,15 +1016,33 @@ class MainApp(QMainWindow):
             if not file_path: return
             if not file_path.endswith(".svg"): file_path += ".svg"
 
-            # 1. Sauvegarde de l'état de visibilité actuel
+            # Forcer le mode double : on vérifie si la case "robot seul" est coché, si c'est le cas, on la décoche sans emettre de signaux
+            # et on force l'affichage des graphiques (pour le bouton exporter graph lorsqu'on est en mode plein écran avec le robot seul)
+            was_robot_only = self.robot_only_checkbox.isChecked()
+            if was_robot_only:
+                self.robot_only_checkbox.blockSignals(True)
+                self.robot_only_checkbox.setChecked(False)
+                self.robot_only_checkbox.blockSignals(False)
+                self.update_plots() # Restaure la grille 1x2 et les graphiques
+
+            # Sauvegarde de l'état de visibilité actuel
             vis_robot = self.ax_robot.get_visible()
             vis_plots = self.ax_plots.get_visible()
+            # On cherche l'axe des chariots s'il existe pour gérer sa visibilité
+            ax_chariots = None
+            for ax in self.fig.axes:
+                if ax.get_label() == 'ax_chariots':
+                    ax_chariots = ax
+                    break
+            vis_chariots = ax_chariots.get_visible() if ax_chariots else False
 
-            # 2. On masque ce qu'on ne veut pas
+            # On masque ce qu'on ne veut pas
             if target == "ctr":
                 self.ax_plots.set_visible(False)
             elif target == "graph":
                 self.ax_robot.set_visible(False)
+                if ax_chariots: # Si le chariots n'est pas None
+                    ax_chariots.set_visible(False) # On cache le rail pour n'avoir QUE la courbe
 
             # 3. Export via Matplotlib (Vecteurs réels)
             try:
@@ -999,11 +1051,20 @@ class MainApp(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Échec export : {str(e)}")
             finally:
-                # 4. On rétablit la visibilité
+                # 4. On remet la visibilité individuelles
                 self.ax_robot.set_visible(vis_robot)
                 self.ax_plots.set_visible(vis_plots)
-                self.canvas.draw()
-                
+                if ax_chariots:
+                    ax_chariots.set_visible(vis_chariots)
+
+                # Si on était en mode "Plein écran", on y retourne silencieusement
+                if was_robot_only:
+                    self.robot_only_checkbox.blockSignals(True)
+                    self.robot_only_checkbox.setChecked(True)
+                    self.robot_only_checkbox.blockSignals(False)
+                    self.update_plots()
+                else:
+                    self.canvas.draw()                
 
     # def save_plot(self):
 
@@ -1045,8 +1106,7 @@ class MainApp(QMainWindow):
 
     def compute_ctr_configuration(
         self,
-        q_values
-    ):
+        q_values    ):
 
         print("=== COMPUTE CTR ===")
         print("q =", q_values)
@@ -1106,35 +1166,44 @@ class MainApp(QMainWindow):
 
         n_steps = self.steps_spinbox.value()
 
-        self.status_label.setText(
-            f"Étape : 0 / {n_steps}"
-        )
+        self.status_label.setText(f"Étape : 0 / {n_steps}")
 
         q_start = np.array(self.current_q)
         q_target = np.array(target_q)
 
         # dernière configuration valide connue
         last_valid_q = q_start.copy()
+        success = True # Initialisation du check pour vérifier si chaque étape s'est bien passée
+
+        # Préparer le GIF
+        record_gif = getattr(self, "record_gif_checkbox", None) and self.record_gif_checkbox.isChecked()
+        frames = [] # Initialisation du stockage des frames
 
         for step_id, alpha in enumerate(
             np.linspace(0.0, 1.0, n_steps + 1)[1:],
             start=1
         ):
 
-            q_interp = (
-                (1 - alpha) * q_start +
-                alpha * q_target
-            )
+            q_interp = ((1 - alpha) * q_start + alpha * q_target)
 
-            self.status_label.setText(
-                f"Étape : {step_id} / {n_steps}"
-            )
+            for i in range(6):
+                self.q_inputs[i].blockSignals(True)
+                # On donne la valeur de l'étape courante pour synchroniser les chariots et les tubes lors des mouvements intermédiaires
+                self.q_inputs[i].setValue(q_interp[i])
+                self.q_inputs[i].blockSignals(False)
 
-            success = self.compute_ctr_configuration(
-                q_interp.tolist()
-            )
+            self.status_label.setText(f"Étape : {step_id} / {n_steps}")
+
+            success = self.compute_ctr_configuration(q_interp.tolist())
 
             QApplication.processEvents()
+
+            # Capture de l'image
+            if record_gif:
+                self.canvas.draw() # Check si matplotlib a fini le dessin du robot
+                rgba_buffer = np.asarray(self.canvas.renderer.buffer_rgba()) # Préserver les pixels du robot
+                img = Image.fromarray(rgba_buffer).convert("RGB") # Conversion de la matrice de pixels en image
+                frames.append(img)
 
             if not success:
 
@@ -1149,6 +1218,30 @@ class MainApp(QMainWindow):
             last_valid_q = q_interp.copy()
             self.last_valid_q = q_interp.copy()
 
+        # Sauvegarde du gif
+        if record_gif and frames:
+            file_path, _ = QFileDialog.getSaveFileName(self, "Enregistrer l'animation", "", "Images Animées (*.gif)")
+            if file_path:
+                if not file_path.endswith(".gif"):
+                    file_path += ".gif"
+                
+                self.status_label.setText("⏳ Création du GIF en cours...")
+                QApplication.processEvents() # Met à jour l'interface pour rassurer l'utilisateur
+                
+                # Calcul de la vitesse : On vise ~2 secondes d'animation au total
+                # Minimum 30ms par frame pour que ça reste fluide
+                duration_per_frame = max(2000 // len(frames), 30) 
+                
+                # On sauvegarde la première image en lui attachant toutes les autres
+                frames[0].save(
+                    file_path,
+                    save_all=True,
+                    append_images=frames[1:],
+                    optimize=True,
+                    duration=duration_per_frame,
+                    loop=0 # 0 = boucle infinie
+                )
+
         self.status_label.setText(
             f"✅ Terminé : {n_steps}/{n_steps}"
         )
@@ -1161,7 +1254,6 @@ class MainApp(QMainWindow):
 
         self.saved_elev = self.ax_robot.elev
         self.saved_azim = self.ax_robot.azim
-
 
 
     def update_plots(self):
@@ -1236,6 +1328,8 @@ class MainApp(QMainWindow):
             length_axis,
             q_current
         )
+
+
 
         # Trajectoire historique de la pointe
         if (
@@ -1402,62 +1496,89 @@ class MainApp(QMainWindow):
         # # 3. Forcer le ratio 1:1:1 pour éviter les déformations visuelles du robot
         # self.ax_robot.set_box_aspect((1, 1, 1))
 
-        # GRAPHES
-        selected_graph = self.graph_selector.currentIndex()
-
-        if selected_graph == 0:
-
-            self.graphs.plot_orientation(
-                matrix_data,
-                length_axis,
-                num_nodes
-            )
         
-        elif selected_graph == 1:
+        # On vérifie si le mode plein écran est activé
+        is_robot_only = getattr(self, "robot_only_checkbox", None) and self.robot_only_checkbox.isChecked()
 
-            self.graphs.plot_tip_orientation_history(
-                self.tip_orientation_history
-            )
-        
-        elif selected_graph == 2:
+        if is_robot_only:
+            # On cache les graphiques pour ne pas les calculer ni les afficher
+            self.ax_plots.set_visible(False)
 
-            self.graphs.plot_twist_distribution(
-                data
-            )
+            # Robot prend 100% de la fenêtre
+            gs_single = gridspec.GridSpec(1, 1)
+            self.ax_robot.set_position(gs_single[0].get_position(self.fig))
+            self.ax_robot.set_subplotspec(gs_single[0])
 
-        # --- CORRECTION DES QUADRILLAGES ---
-        self.ax_plots.grid(True, linestyle=':', alpha=0.6, zorder=2)
+        else:
+            # On affiche les graphiques
+            self.ax_plots.set_visible(True)
 
-        if selected_graph != 1:
+            # Retour à la taille du robot avec graphique
+            gs_double = gridspec.GridSpec(1, 2)
+            self.ax_robot.set_position(gs_double[0].get_position(self.fig))
+            self.ax_robot.set_subplotspec(gs_double[0])
+            
+            self.ax_plots.set_position(gs_double[1].get_position(self.fig))
+            self.ax_plots.set_subplotspec(gs_double[1])
 
-            self.ax_plots.set_xlabel(
-                "Longueur du robot (m)"
-            )
 
-            self.ax_plots.set_xlim(
-                [0, length_axis[-1] * 1.05]
-            )
+            # GRAPHES
 
-            self.ax_plots.grid(
-                True,
-                linestyle=':',
-                alpha=0.6,
-                zorder=2
-            )
+            selected_graph = self.graph_selector.currentIndex()
 
-            self.ax_plots.legend(
-                loc="upper right",
-                fontsize=9,
-                framealpha=0.9
-            )
+            if selected_graph == 0:
+
+                self.graphs.plot_orientation(
+                    matrix_data,
+                    length_axis,
+                    num_nodes
+                )
+            
+            elif selected_graph == 1:
+
+                self.graphs.plot_tip_orientation_history(
+                    self.tip_orientation_history
+                )
+            
+            elif selected_graph == 2:
+
+                self.graphs.plot_twist_distribution(
+                    data
+                )
+
+            # --- CORRECTION DES QUADRILLAGES ---
+            self.ax_plots.grid(True, linestyle=':', alpha=0.6, zorder=2)
+
+            if selected_graph != 1:
+
+                self.ax_plots.set_xlabel(
+                    "Longueur du robot (m)"
+                )
+
+                self.ax_plots.set_xlim(
+                    [0, length_axis[-1] * 1.05]
+                )
+
+                self.ax_plots.grid(
+                    True,
+                    linestyle=':',
+                    alpha=0.6,
+                    zorder=2
+                )
+
+                self.ax_plots.legend(
+                    loc="upper right",
+                    fontsize=9,
+                    framealpha=0.9
+                )
 
         # Mise à jour du panneau
         self.tip_info_label.setText(
-            f"Organe terminal:\n"
+            f"Position de l'organe terminal par rapport à la base :\n"
             f"x = {tip_x*1000:.1f} mm\n"
             f"y = {tip_y*1000:.1f} mm\n"
             f"z = {tip_z*1000:.1f} mm\n\n"
-            f"Orientation:\n"
+            f"Orientation de l'organe terminal par rapport à la base :\n"
             f"X = {tip_angle_x:.1f}°\n"
             f"Y = {tip_angle_y:.1f}°\n"
             f"Z = {tip_angle_z:.1f}°"
@@ -1470,8 +1591,15 @@ class MainApp(QMainWindow):
                 ax.remove()
 
         if self.chariots_checkbox.isChecked():
+
+            if is_robot_only: # Cas où le robot est seul sur la fenêtre
+                rail_position = [0.35, 0.04, 0.30, 0.03] # Centré
+            else:
+                rail_position = [0.10, 0.04, 0.30, 0.03] # À gauche
+
+
             # 2. Création d'un axe très fin en bas de l'écran [gauche, bas, largeur, hauteur]
-            ax_chariots = self.fig.add_axes([0.15, 0.04, 0.30, 0.03], label='ax_chariots')
+            ax_chariots = self.fig.add_axes(rail_position, label='ax_chariots')
             
             
             colors = ['#08ff08', 'blue', 'red']
