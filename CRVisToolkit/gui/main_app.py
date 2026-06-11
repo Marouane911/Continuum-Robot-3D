@@ -433,7 +433,7 @@ class MainApp(QMainWindow):
             if i < 3:
 
                 spinbox.setRange(
-                    -0.50, ### HERE
+                    -0.50,
                     0.05
                 )
 
