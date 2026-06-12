@@ -113,7 +113,6 @@ class CTRVisualizer:
             z1[idx_local_1:],
             linewidth=(2 * r_tube[0]) * scale, color='#1e9600')
 
-
         # Pointe
         self.ax_robot.scatter(
             x[-1],

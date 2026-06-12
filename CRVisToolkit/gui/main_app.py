@@ -455,7 +455,7 @@ class MainApp(QMainWindow):
                 )
 
                 spinbox.setSingleStep(
-                    0.1
+                    0.02
                 )
 
             spinbox.setValue(
