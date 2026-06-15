@@ -7,9 +7,7 @@ class CTRVisualizer:
 
     def draw_robot(
         self,
-        x,
-        y,
-        z,
+        x,y,z,
         end_ext,
         end_mid,
         end_int,
@@ -17,12 +15,9 @@ class CTRVisualizer:
         l_kappa_tubes,
         l_tubes,
         length_axis,
-        q # translations
-    ):
+        q ):
+
         scale = 1000
-        print(l_kappa_tubes)
-        print(f"DEBUG: end_ext={end_ext}, end_mid={end_mid}, end_int={end_int}")
-        print(f"Tailles segments : Ext={end_ext}, Mid={end_mid-end_ext}, Int={end_int-end_mid}")
 
         # tube 3 : externe (Zone de la base à end_ext)
         x3 = x[:end_ext]
@@ -42,16 +37,20 @@ class CTRVisualizer:
         if idx_local_3 > len(x3): idx_local_3 = len(x3)
 
         # Dessin Tube 3
+        # Partie droite
         self.ax_robot.plot(
-            x3[:idx_local_3],
-            y3[:idx_local_3],
-            z3[:idx_local_3],
-            linewidth=(2 * r_tube[2]) * scale * 3, color="#ff0000")
+            x3[:idx_local_3+1],
+            y3[:idx_local_3+1],
+            z3[:idx_local_3+1],
+            linewidth=(2 * r_tube[2]) * scale * 3, color="#ff0000",
+            solid_capstyle="butt")
+        # Partie courbée
         self.ax_robot.plot(
             x3[idx_local_3:],
             y3[idx_local_3:],
             z3[idx_local_3:],
-            linewidth=(2 * r_tube[2]) * scale * 3, color="#8c0000")
+            linewidth=(2 * r_tube[2]) * scale * 3, color="#8c0000",
+            solid_capstyle="butt")
 
 
         # tube 2 : intermédiaire (Zone de end_ext à end_mid)
@@ -72,16 +71,20 @@ class CTRVisualizer:
         if idx_local_2 > len(x2): idx_local_2 = len(x2)
 
         # Dessin Tube 2
+        # Partie droite
         self.ax_robot.plot(
-            x2[:idx_local_2],
-            y2[:idx_local_2],
-            z2[:idx_local_2],
-            linewidth=(2 * r_tube[1]) * scale * 2, color="#00f2ff")
+            x2[:idx_local_2+1],
+            y2[:idx_local_2+1],
+            z2[:idx_local_2+1],
+            linewidth=(2 * r_tube[1]) * scale * 2, color="#00f2ff",
+            solid_capstyle="butt")
+        # Partie courbée
         self.ax_robot.plot(
             x2[idx_local_2:],
             y2[idx_local_2:],
             z2[idx_local_2:],
-            linewidth=(2 * r_tube[1]) * scale * 2, color="#00a2ab")
+            linewidth=(2 * r_tube[1]) * scale * 2, color="#00a2ab",
+            solid_capstyle="butt")
 
 
         # tube 1 : interne (Zone de end_mid à end_int)
@@ -102,16 +105,20 @@ class CTRVisualizer:
         if idx_local_1 > len(x1): idx_local_1 = len(x1)
 
         # Dessin Tube 1
+        # Partie droite
         self.ax_robot.plot(
-            x1[:idx_local_1],
-            y1[:idx_local_1],
-            z1[:idx_local_1],
-            linewidth=(2 * r_tube[0]) * scale, color='#33ff00')
+            x1[:idx_local_1+1],
+            y1[:idx_local_1+1],
+            z1[:idx_local_1+1],
+            linewidth=(2 * r_tube[0]) * scale, color='#33ff00',
+            solid_capstyle="butt")
+        # Partie courbée
         self.ax_robot.plot(
             x1[idx_local_1:],
             y1[idx_local_1:],
             z1[idx_local_1:],
-            linewidth=(2 * r_tube[0]) * scale, color='#1e9600')
+            linewidth=(2 * r_tube[0]) * scale, color='#1e9600',
+            solid_capstyle="butt")
 
         # Pointe
         self.ax_robot.scatter(

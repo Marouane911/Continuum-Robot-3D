@@ -4,6 +4,7 @@ import numpy as np
 import subprocess
 import shutil
 import csv
+from matplotlib.ticker import MaxNLocator
  
 from PyQt5.QtCore import Qt, QLocale
 from PyQt5.QtWidgets import (
@@ -163,6 +164,10 @@ class MainApp(QMainWindow):
         self.ax_robot.dist = current_dist
 
         self.compute_ctr_configuration(self.current_q)
+
+        self.saved_elev = 20
+        self.saved_azim = -45
+        self.saved_dist = 9
 
         self.set_current_as_home()
         # Gestion de l'affichage robot et/ou graph
@@ -467,6 +472,8 @@ class MainApp(QMainWindow):
                 self.on_spinbox_changed(idx)
             )
 
+            spinbox.setKeyboardTracking(False)
+
             self.q_inputs.append(
                 spinbox
             )
@@ -583,7 +590,7 @@ class MainApp(QMainWindow):
             "Afficher les chariots"
         )
         self.chariots_checkbox.setChecked(False)
-        self.chariots_checkbox.toggled.connect(
+        self.chariots_checkbox.stateChanged.connect(
             self.update_plots
         )
         config_layout.addWidget(self.chariots_checkbox)
@@ -894,8 +901,6 @@ class MainApp(QMainWindow):
 
         self.current_q = self.last_valid_q.copy()
 
-        print("Retour à la dernière position valide")
-
         
     def set_current_as_home(self):
 
@@ -1025,24 +1030,28 @@ class MainApp(QMainWindow):
                 self.robot_only_checkbox.blockSignals(False)
                 self.update_plots() # Restaure la grille 1x2 et les graphiques
 
-            # Sauvegarde de l'état de visibilité actuel
-            vis_robot = self.ax_robot.get_visible()
-            vis_plots = self.ax_plots.get_visible()
-            # On cherche l'axe des chariots s'il existe pour gérer sa visibilité
+            # SAUVEGARDE UNIVERSELLE
+            # On mémorise la visibilité de TOUS les axes (y compris les axes fantômes comme twinx)
+            saved_visibilities = {ax: ax.get_visible() for ax in self.fig.axes}
+            
+            # On cherche l'axe des chariots s'il existe
             ax_chariots = None
             for ax in self.fig.axes:
                 if ax.get_label() == 'ax_chariots':
                     ax_chariots = ax
                     break
-            vis_chariots = ax_chariots.get_visible() if ax_chariots else False
 
-            # On masque ce qu'on ne veut pas
+            # --- MASQUAGE CIBLÉ ---
             if target == "ctr":
-                self.ax_plots.set_visible(False)
+                # On cache absolument TOUT ce qui n'est ni le robot, ni le rail
+                for ax in self.fig.axes:
+                    if ax != self.ax_robot and ax != ax_chariots:
+                        ax.set_visible(False)
+                        
             elif target == "graph":
                 self.ax_robot.set_visible(False)
-                if ax_chariots: # Si le chariots n'est pas None
-                    ax_chariots.set_visible(False) # On cache le rail pour n'avoir QUE la courbe
+                if ax_chariots:
+                    ax_chariots.set_visible(False)
 
             # 3. Export via Matplotlib (Vecteurs réels)
             try:
@@ -1051,11 +1060,9 @@ class MainApp(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Échec export : {str(e)}")
             finally:
-                # 4. On remet la visibilité individuelles
-                self.ax_robot.set_visible(vis_robot)
-                self.ax_plots.set_visible(vis_plots)
-                if ax_chariots:
-                    ax_chariots.set_visible(vis_chariots)
+                # 4. On restaure la visibilité de TOUS les axes à leur état d'origine
+                for ax, is_visible in saved_visibilities.items():
+                    ax.set_visible(is_visible)
 
                 # Si on était en mode "Plein écran", on y retourne silencieusement
                 if was_robot_only:
@@ -1066,43 +1073,6 @@ class MainApp(QMainWindow):
                 else:
                     self.canvas.draw()                
 
-    # def save_plot(self):
-
-    #     file_path, _ = QFileDialog.getSaveFileName(
-    #         self,
-    #         "Exporter CTR",
-    #         "ctr_visualization.svg",
-    #         "SVG Vectoriel (*.svg)"
-    #     )
-        
-    #     if not file_path.endswith(".svg"):
-    #         file_path += ".svg"
-
-    #     try:
-
-    #         # Capture de toute la fenêtre
-    #         pixmap = self.grab()
-    #         pixmap = pixmap.scaled(
-    #             pixmap.width() * 2,
-    #             pixmap.height() * 2,
-    #             Qt.KeepAspectRatio,
-    #             Qt.SmoothTransformation
-    #         )
-    #         pixmap.save(file_path)
-
-    #         QMessageBox.information(
-    #             self,
-    #             "Sauvegarde réussie",
-    #             f"La fenêtre complète a été enregistrée.\n\n{file_path}"
-    #         )
-
-    #     except Exception as e:
-
-    #         QMessageBox.critical(
-    #             self,
-    #             "Erreur",
-    #             str(e)
-    #         )
 
     def compute_ctr_configuration(
         self,
@@ -1255,13 +1225,28 @@ class MainApp(QMainWindow):
         self.saved_elev = self.ax_robot.elev
         self.saved_azim = self.ax_robot.azim
 
+        self.saved_xlim = self.ax_robot.get_xlim3d()
+        self.saved_ylim = self.ax_robot.get_ylim3d()
+        self.saved_zlim = self.ax_robot.get_zlim3d()
 
     def update_plots(self):
 
         if not self.steps_data or self.current_step >= len(self.steps_data):
             return
-        
-        # === RÉCUPÉRATION DES TRANSLATIONS COURANTES ===
+
+        try:
+            self.saved_elev = self.ax_robot.elev
+            self.saved_azim = self.ax_robot.azim
+            self.saved_dist = self.ax_robot.dist
+        except:
+            pass
+
+        # -- SAUVEGARDER LA CAMÉRA AVANT DE TOUT EFFACER --
+        current_elev = getattr(self, "saved_elev", 20)
+        current_azim = getattr(self, "saved_azim", -45)
+        current_dist = getattr(self, "saved_dist", 9)
+
+        # -- RÉCUPÉRATION DES TRANSLATIONS COURANTES --
         q_current = [self.q_inputs[i].value() for i in range(3)]
 
         # Récupération de la matrice (19, N) pré-filtrée
@@ -1274,44 +1259,32 @@ class MainApp(QMainWindow):
         )
 
         matrix_data = data.matrix_data
-
         x = data.x
         y = data.y
         z = data.z
-
         length_axis = data.length_axis
-
         end_ext = data.end_ext
         end_mid = data.end_mid
         end_int = data.end_int
-
         num_nodes = data.num_nodes
-
         R_tip = data.R_tip
-
         tip_x = data.tip_x
         tip_y = data.tip_y
         tip_z = data.tip_z
-
         tip_angle_x = data.tip_angle_x
         tip_angle_y = data.tip_angle_y
         tip_angle_z = data.tip_angle_z
-
         theta_2 = data.theta_2
         theta_3 = data.theta_3
 
-        # Tentative debugging affichage
-
-        current_elev = getattr(self, "saved_elev", 20)
-        current_azim = getattr(self, "saved_azim", -45)
-
+        # EFFACER LES GRAPHIQUES
+        current_xlim = getattr(self, "saved_xlim", None)
+        current_ylim = getattr(self, "saved_ylim", None)
+        current_zlim = getattr(self, "saved_zlim", None)
         self.ax_robot.cla()
         self.ax_plots.cla()
-        self.ax_robot.view_init(elev=current_elev, azim=current_azim)
-        
 
-
-        # RENDU DU ROBOT 3D
+        # -- RENDU DU ROBOT 3D --
         l_kappa_tubes = self.get_l_kappa_tubes()
         l_tubes = self.get_l_tubes()
 
@@ -1330,18 +1303,14 @@ class MainApp(QMainWindow):
         )
 
 
-
-        # Trajectoire historique de la pointe
-        if (
-            self.tip_path_checkbox.isChecked()
-            and len(self.tip_path_x) > 1
-        ):
+        # TRAJECTOIRE HISTORIQUE DE LA POINTE
+        if (self.tip_path_checkbox.isChecked() and len(self.tip_path_x) > 1):
             self.ax_robot.plot(
                 self.tip_path_x,
                 self.tip_path_y,
                 self.tip_path_z,
                 '--',
-                linewidth=2,
+                linewidth=1,
                 color='dodgerblue',
                 alpha=0.6,
                 label="Tip path"
@@ -1353,40 +1322,38 @@ class MainApp(QMainWindow):
             self.tip_path_y.append(tip_y)
             self.tip_path_z.append(tip_z)
 
-        elif (
+        elif(
             abs(tip_x - self.tip_path_x[-1]) > 1e-6
             or abs(tip_y - self.tip_path_y[-1]) > 1e-6
-            or abs(tip_z - self.tip_path_z[-1]) > 1e-6
-        ):
+            or abs(tip_z - self.tip_path_z[-1]) > 1e-6):
+            
             self.tip_path_x.append(tip_x)
             self.tip_path_y.append(tip_y)
             self.tip_path_z.append(tip_z)
 
 
         if len(self.tip_orientation_history["x"]) == 0:
-
             self.tip_orientation_history["x"].append(tip_angle_x)
             self.tip_orientation_history["y"].append(tip_angle_y)
             self.tip_orientation_history["z"].append(tip_angle_z)
 
         else:
 
-            if (
+            if(
                 abs(self.tip_orientation_history["x"][-1] - tip_angle_x) > 1e-6
                 or abs(self.tip_orientation_history["y"][-1] - tip_angle_y) > 1e-6
-                or abs(self.tip_orientation_history["z"][-1] - tip_angle_z) > 1e-6
-            ):
+                or abs(self.tip_orientation_history["z"][-1] - tip_angle_z) > 1e-6):
 
                 self.tip_orientation_history["x"].append(tip_angle_x)
                 self.tip_orientation_history["y"].append(tip_angle_y)
                 self.tip_orientation_history["z"].append(tip_angle_z)
 
 
-        # Axes du repère
+        # AXES DU REPÈRE
+        self.visualizer.draw_world_frame() # à la base
+        self.visualizer.draw_tip_frame(tip_x,tip_y,tip_z,R_tip) # au niveau de l'organe terminal
 
-        self.visualizer.draw_world_frame()
-
-        # ========= RENDU DES CHARIOTS AVEC AXE DE LIAISON (AMÉLIORÉ) =========
+        # RENDU DES CHARIOTS AVEC AXE DE LIAISON
         if self.chariots_checkbox.isChecked():
             colors = ['#08ff08', 'blue', 'red']
             labels = ["Tube 1 (Interne)", "Tube 2 (Milieu)", "Tube 3 (Externe)"]
@@ -1394,116 +1361,77 @@ class MainApp(QMainWindow):
             # 1. Dessiner l'axe central (Z) transparent ou pointillé qui sert de guide
             min_beta = min(q_current)
             self.ax_robot.plot(
-                [0, 0], [0, 0], [min_beta * 1.1, 0],
+                [0, 0], [0, 0], [min_beta * 1.1, 0], # Ligne virtuelle verticale de coulissement
                 color='gray', linestyle='--', linewidth=1, alpha=0.7
             )
             
             # 2. Dessiner chaque chariot avec sa ligne de guidage et sa projection
             for idx, beta in enumerate(q_current):
-                # Le point du chariot sur l'axe Z
+                # Placer le point du chariot sur l'axe Z pour chaque tube
                 self.ax_robot.plot(
                     [0], [0], [beta], 
-                    marker='o', markersize=12, color=colors[idx],
+                    marker='o', markersize=3, color=colors[idx],
                     zorder=5, label=f"Chariot {labels[idx]}"
                 )
                 
-                # Une ligne horizontale (croisillon) pour accentuer l'effet de plateau/chariot
-                self.ax_robot.plot(
-                    [-0.01, 0.01], [0, 0], [beta, beta], 
-                    color=colors[idx], linewidth=2
-                )
-                self.ax_robot.plot(
-                    [0, 0], [-0.01, 0.01], [beta, beta], 
-                    color=colors[idx], linewidth=2
-                )
+                # Représentation des chartios par des X
+                self.ax_robot.plot([-0.01, 0.01], [0, 0], [beta, beta], color=colors[idx], linewidth=2)
+                self.ax_robot.plot([0, 0], [-0.01, 0.01], [beta, beta],color=colors[idx], linewidth=2)
 
-                # Une ligne fine pointillée qui relie le chariot à la base visible du robot (Z=0)
-                # Cela permet de voir la "tige" virtuelle ou la partie cachée du tube
+                # Ligne fine en pointillée qui relie chaque chariot à son tube pour voir la trajectoire
                 self.ax_robot.plot(
                     [0, 0], [0, 0], [beta, 0],
                     color=colors[idx], linestyle=':', linewidth=1.5, alpha=0.6
                 )
 
 
-        # Axes du repère de l'organe terminal
-
-        self.visualizer.draw_tip_frame(
-            tip_x,
-            tip_y,
-            tip_z,
-            R_tip
-        )
-
-
-        # ========= FANTÔME =========
-
+        # --FANTÔME --
         if self.ghost_checkbox.isChecked():
+            self.visualizer.draw_ghost(self.ghost_robot,self.r_tube)
 
-            self.visualizer.draw_ghost(
-                self.ghost_robot,
-                self.r_tube
-            )
 
-        # === MULTI-MODIFICATION : RIGIDIFICATION DU CADRE 3D (FINI LA GRILLE DANSANTE) ===
+        # CONFIGURATION DES AXES 3D
         self.ax_robot.set_title("Modélisation CTR en 3D", pad=50, fontsize=12, fontweight='bold')
 
-        # 1. Définition des dimensions physiques fixes du cadre (en mètres)
+        # DIMENSION DU CADRE (en mètres)
         XY_CADRE = 0.15     # Largeur de la boîte : +/- 8 cm à gauche et à droite
-        
         # Le Z minimal descend à -15 cm si les chariots sont visibles pour les afficher proprement
-        Z_MIN_CADRE = -0.15 if self.chariots_checkbox.isChecked() else -0.02
+        Z_MIN_CADRE = -0.15 if self.chariots_checkbox.isChecked() else 0.0
         Z_MAX_CADRE = 0.45   # Hauteur maximale du graphique fixe (35 cm)
-
-        # 2. Application des limites strictes
+        # Application des limites strictes
         self.ax_robot.set_xlim(-XY_CADRE, XY_CADRE)
         self.ax_robot.set_ylim(-XY_CADRE, XY_CADRE)
         self.ax_robot.set_zlim(Z_MIN_CADRE, Z_MAX_CADRE)
-
-        # 3. ÉQUIVALENT "EQUAL AXES" 3D : On impose des proportions réalistes (sans déformation)
+        # ÉQUIVALENT "EQUAL AXES" 3D : on évite les déformations
         hauteur_totale = Z_MAX_CADRE - Z_MIN_CADRE
         largeur_totale = 2 * XY_CADRE
-
-        # on applique directement les dimensions physiques réelles
+        # on applique les dimensions
         self.ax_robot.set_box_aspect((largeur_totale, largeur_totale, hauteur_totale))
 
-        self.ax_robot.dist = 15 # Dézoome de la zone matplolib 3D CTR
+        self.ax_robot.xaxis.set_major_locator(
+            MaxNLocator(nbins=5)
+        )
 
-        # === AJOUT : ENREGISTREMENT DU ZOOM ET DES ROTATIONS FAITS À LA SOURIS ===
+        self.ax_robot.yaxis.set_major_locator(
+            MaxNLocator(nbins=5)
+        )
+
+        self.ax_robot.zaxis.set_major_locator(
+            MaxNLocator(nbins=7)
+        )
+
+        # ENREGISTREMENT DES ROTATIONS DE LA CAMÉRA
         # À chaque rafraîchissement, on mémorise la position de la caméra laissée par l'utilisateur
         self.saved_elev = self.ax_robot.elev
         self.saved_azim = self.ax_robot.azim
-        self.saved_dist = self.ax_robot.dist  # Sauvegarde du niveau de zoom !
 
-
-        # # AFFICHAGE 3D CTR
-        # self.ax_robot.set_title("Modélisation CTR en 3D")
-
-        # # 1. Calcul des limites dynamiques basées sur la géométrie réelle du robot
-        # # On prend le max absolu en X et Y pour garder un repère centré et carré
-        # max_xy = max(np.max(np.abs(x)), np.max(np.abs(y)), 0.05) * 1.2
-        # # On ajuste le Z max avec une marge de 10% au-dessus de la pointe
-        # max_z = max(np.max(z), 0.10) * 1.1
-
-        # # 2. Application des nouvelles limites adaptatives
-        # self.ax_robot.set_xlim(-max_xy, max_xy)
-        # self.ax_robot.set_ylim(-max_xy, max_xy)
-        # self.ax_robot.set_zlim(0.0, max_z)
-
-        # # # On ajuste le Z minimal pour voir les chariots s'ils sont cochés
-        # # min_z = min(q_current) * 1.2 if self.chariots_checkbox.isChecked() else 0.0
-        # # self.ax_robot.set_zlim(min_z, max_z)
-
-        # # 3. Forcer le ratio 1:1:1 pour éviter les déformations visuelles du robot
-        # self.ax_robot.set_box_aspect((1, 1, 1))
-
-        
+        # GESTION DU LAYOUT (Robot seul ou avec graphiques)
         # On vérifie si le mode plein écran est activé
         is_robot_only = getattr(self, "robot_only_checkbox", None) and self.robot_only_checkbox.isChecked()
 
         if is_robot_only:
             # On cache les graphiques pour ne pas les calculer ni les afficher
             self.ax_plots.set_visible(False)
-
             # Robot prend 100% de la fenêtre
             gs_single = gridspec.GridSpec(1, 1)
             self.ax_robot.set_position(gs_single[0].get_position(self.fig))
@@ -1512,67 +1440,34 @@ class MainApp(QMainWindow):
         else:
             # On affiche les graphiques
             self.ax_plots.set_visible(True)
-
             # Retour à la taille du robot avec graphique
             gs_double = gridspec.GridSpec(1, 2)
             self.ax_robot.set_position(gs_double[0].get_position(self.fig))
             self.ax_robot.set_subplotspec(gs_double[0])
-            
             self.ax_plots.set_position(gs_double[1].get_position(self.fig))
             self.ax_plots.set_subplotspec(gs_double[1])
 
 
-            # GRAPHES
-
+            # GRAPHIQUES
             selected_graph = self.graph_selector.currentIndex()
 
             if selected_graph == 0:
-
-                self.graphs.plot_orientation(
-                    matrix_data,
-                    length_axis,
-                    num_nodes
-                )
-            
+                self.graphs.plot_orientation(matrix_data,length_axis,num_nodes)
             elif selected_graph == 1:
-
-                self.graphs.plot_tip_orientation_history(
-                    self.tip_orientation_history
-                )
-            
+                self.graphs.plot_tip_orientation_history(self.tip_orientation_history)
             elif selected_graph == 2:
+                self.graphs.plot_twist_distribution(data)
 
-                self.graphs.plot_twist_distribution(
-                    data
-                )
-
-            # --- CORRECTION DES QUADRILLAGES ---
+            # CORRECTION DES QUADRILLAGES
             self.ax_plots.grid(True, linestyle=':', alpha=0.6, zorder=2)
 
             if selected_graph != 1:
+                self.ax_plots.set_xlabel("Longueur du robot (m)")
+                self.ax_plots.set_xlim([0, length_axis[-1] * 1.05])
+                self.ax_plots.grid(True,linestyle=':',alpha=0.6,zorder=2)
+                self.ax_plots.legend(loc="upper right",fontsize=9,framealpha=0.9)
 
-                self.ax_plots.set_xlabel(
-                    "Longueur du robot (m)"
-                )
-
-                self.ax_plots.set_xlim(
-                    [0, length_axis[-1] * 1.05]
-                )
-
-                self.ax_plots.grid(
-                    True,
-                    linestyle=':',
-                    alpha=0.6,
-                    zorder=2
-                )
-
-                self.ax_plots.legend(
-                    loc="upper right",
-                    fontsize=9,
-                    framealpha=0.9
-                )
-
-        # Mise à jour du panneau
+        # Mise à jour du panneau d'information de l'organe terminal
         self.tip_info_label.setText(
             f"Position de l'organe terminal par rapport à la base :\n"
             f"x = {tip_x*1000:.1f} mm\n"
@@ -1584,24 +1479,20 @@ class MainApp(QMainWindow):
             f"Z = {tip_angle_z:.1f}°"
         )
 
-        # ========= AFFICHAGE DES CHARIOTS (RAIL HORIZONTAL) =========
-        # 1. Nettoyage : On supprime l'ancien rail s'il existe pour éviter de superposer les graphiques
+        # AFFICHAGE DES CHARIOTS (RAIL HORIZONTAL, en bas)
+        # On supprime l'ancien rail s'il existe pour éviter de superposer les graphiques
         for ax in self.fig.axes:
             if ax.get_label() == 'ax_chariots':
                 ax.remove()
 
         if self.chariots_checkbox.isChecked():
-
             if is_robot_only: # Cas où le robot est seul sur la fenêtre
                 rail_position = [0.35, 0.04, 0.30, 0.03] # Centré
             else:
                 rail_position = [0.10, 0.04, 0.30, 0.03] # À gauche
 
-
-            # 2. Création d'un axe très fin en bas de l'écran [gauche, bas, largeur, hauteur]
+            # Création d'un axe très fin en bas de l'écran
             ax_chariots = self.fig.add_axes(rail_position, label='ax_chariots')
-            
-            
             colors = ['#08ff08', 'blue', 'red']
             
             # Ligne de guidage horizontale (le rail)
@@ -1627,7 +1518,18 @@ class MainApp(QMainWindow):
             ax_chariots.spines['right'].set_visible(False)
             ax_chariots.spines['left'].set_visible(False)
             ax_chariots.grid(True, axis='x', linestyle=':', alpha=0.6)
-            
+        
+        # CONSERVATION DU ZOOM
+        if current_xlim is not None:
+            self.ax_robot.set_xlim3d(current_xlim)
+
+        if current_ylim is not None:
+            self.ax_robot.set_ylim3d(current_ylim)
+
+        if current_zlim is not None:
+            self.ax_robot.set_zlim3d(current_zlim)
+        
+        # REDESSINER
         self.canvas.draw_idle()
 
 
