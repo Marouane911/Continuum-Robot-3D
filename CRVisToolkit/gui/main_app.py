@@ -29,6 +29,7 @@ from ctr_loader import CTRLoader
 from ctr_status import CTRStatus
 from ctr_solver import CTRSolver
 
+from ctr_vtk_export import CTRVTKExporter
 
 
 # --- GESTION DU REPERTOIRE DE PYTHON (Dossier frère) ---
@@ -1532,6 +1533,10 @@ class MainApp(QMainWindow):
         # REDESSINER
         self.canvas.draw_idle()
 
+        CTRVTKExporter.export_centerline(
+            matrix_data,
+            "/tmp/robot_centerline.vtk"
+        )
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
