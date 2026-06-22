@@ -1533,10 +1533,19 @@ class MainApp(QMainWindow):
         # REDESSINER
         self.canvas.draw_idle()
 
-        CTRVTKExporter.export_centerline(
-            matrix_data,
-            "/tmp/robot_centerline.vtk"
-        )
+        print("iEnd =", step["iEnd"])
+        print("S shape =", len(step["S"]))
+        print("num_nodes =", num_nodes)
+
+        print("end_int =", end_int)
+        print("end_mid =", end_mid)
+        print("end_ext =", end_ext)
+
+        print("S[iEnd[0]] =", step["S"][step["iEnd"][0]])
+        print("S[iEnd[1]] =", step["S"][step["iEnd"][1]])
+        print("S[iEnd[2]] =", step["S"][step["iEnd"][2]])
+
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

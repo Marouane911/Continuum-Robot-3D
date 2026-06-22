@@ -9,21 +9,46 @@ os.environ["LANG"] = "C"
 # Force également la locale générale en mode C pour éviter
 # les problèmes de formatage liés à la langue du système.
 
-
-import numpy as np
-# Bibliothèque de calcul numérique utilisée pour manipuler les matrices.
-
 import vtk
 # Bibliothèque VTK utilisée pour construire et exporter la géométrie 3D.
+from vtk.util import numpy_support
 
 
 class CTRVTKExporter:
     # Classe utilitaire chargée d'exporter la géométrie du robot.
 
     @staticmethod
-    def export_centerline(matrix, output_path):
+    def create_polyline(x, y, z, n_points):
+
+        points = vtk.vtkPoints()
+
+        for i in range(n_points):
+            points.InsertNextPoint(
+                float(x[i]),
+                float(y[i]),
+                float(z[i])
+            )
+
+        polyline = vtk.vtkPolyLine()
+        polyline.GetPointIds().SetNumberOfIds(n_points)
+
+        for i in range(n_points):
+            polyline.GetPointIds().SetId(i, i)
+
+        cells = vtk.vtkCellArray()
+        cells.InsertNextCell(polyline)
+
+        polydata = vtk.vtkPolyData()
+        polydata.SetPoints(points)
+        polydata.SetLines(cells)
+
+        return polydata
+
+    @staticmethod
+    def export_centerline(matrix, end_int, end_mid, end_ext, output_path):
         # Méthode statique qui reçoit :
         # - matrix : matrice 3xN contenant les coordonnées du centre du robot
+        # - les longueurs des différents tubes
         # - output_path : chemin du fichier .vtk à générer
 
         x = matrix[0, :]
@@ -35,69 +60,55 @@ class CTRVTKExporter:
         z = matrix[2, :]
         # Coordonnées Z de tous les points de la centreline.
 
-        points = vtk.vtkPoints()
-        # Structure VTK destinée à stocker les points 3D.
+        poly_int = CTRVTKExporter.create_polyline(
+            x, y, z, end_int
+        ) # Création de polyline du tube interne
 
-        for xi, yi, zi in zip(x, y, z):
-            # Parcourt simultanément les coordonnées X, Y et Z.
+        poly_mid = CTRVTKExporter.create_polyline(
+            x, y, z, end_mid
+        ) # Création de polyline du tube intermédiaire
 
-            points.InsertNextPoint(
-                float(xi),
-                float(yi),
-                float(zi)
-            )
-            # Ajoute un point 3D dans la structure VTK.
-
-        polyline = vtk.vtkPolyLine()
-        # Création d'une polyligne reliant les points de la centreline.
-
-        polyline.GetPointIds().SetNumberOfIds(len(x))
-        # Réserve un identifiant pour chaque point.
-
-        for i in range(len(x)):
-            # Parcourt tous les points.
-
-            polyline.GetPointIds().SetId(i, i)
-            # Relie chaque identifiant au point correspondant.
-
-        cells = vtk.vtkCellArray()
-        # Structure VTK contenant les cellules géométriques.
-
-        cells.InsertNextCell(polyline)
-        # Ajoute la polyligne dans le tableau de cellules.
-
-        polydata = vtk.vtkPolyData()
-        # Objet VTK principal contenant la géométrie.
-
-        polydata.SetPoints(points)
-        # Associe les points à la géométrie.
-
-        polydata.SetLines(cells)
-        # Associe la polyligne à la géométrie.
+        poly_ext = CTRVTKExporter.create_polyline(
+            x, y, z, end_ext
+        ) # Création de polyline du tube externe
 
         # ------------------------------------------------------------------
         # Transformation de la ligne centrale en tube 3D
 
-        tube = vtk.vtkTubeFilter()
-        # Filtre VTK transformant une ligne en cylindre.
+        # Tube interne
+        tube_int = vtk.vtkTubeFilter()
+        tube_int.SetInputData(poly_int)
+        tube_int.SetRadius(0.000762)
+        tube_int.SetNumberOfSides(16)
+        tube_int.CappingOn()
+        tube_int.Update()
 
-        tube.SetInputData(polydata)
-        # Fournit la centreline comme entrée du filtre.
+        # Tube milieu
+        tube_mid = vtk.vtkTubeFilter()
+        tube_mid.SetInputData(poly_mid)
+        tube_mid.SetRadius(0.000900)
+        tube_mid.SetNumberOfSides(16)
+        tube_mid.CappingOn()
+        tube_mid.Update()
 
-        tube.SetRadius(0.002)
-        # Rayon du tube : 2cm.
+        # Tube externe
+        tube_ext = vtk.vtkTubeFilter()
+        tube_ext.SetInputData(poly_ext)
+        tube_ext.SetRadius(0.001175)
+        tube_ext.SetNumberOfSides(16)
+        tube_ext.CappingOn()
+        tube_ext.Update()
 
-        tube.SetNumberOfSides(16)
-        # Nombre de faces utilisées pour approximer le cercle.
-        # Plus la valeur est grande, plus le tube paraît lisse.
+        # Fusion des trois tubes
+        append = vtk.vtkAppendPolyData()
 
-        tube.CappingOn()
-        # Ferme les extrémités du tube.
+        append.AddInputData(tube_int.GetOutput())
+        append.AddInputData(tube_mid.GetOutput())
+        append.AddInputData(tube_ext.GetOutput())
 
-        tube.Update()
-        # Exécute le filtre.
+        append.Update()
 
-        polydata = tube.GetOutput()
+        polydata = append.GetOutput()
         # Récupère le résultat généré par le TubeFilter.
 
         print("Points =", polydata.GetNumberOfPoints())
@@ -121,6 +132,9 @@ class CTRVTKExporter:
         triangleFilter = vtk.vtkTriangleFilter()
         # Filtre transformant toutes les surfaces en triangles.
 
+        cells = polydata.GetPolys()
+        print("Cell array :", cells)
+
         triangleFilter.SetInputData(polydata)
         # Fournit le tube en entrée.
 
@@ -129,6 +143,26 @@ class CTRVTKExporter:
 
         polydata = triangleFilter.GetOutput()
         # Récupère le maillage triangulé.
+
+        # DEBUGGINNGG TRIANGLE NUMPY ?
+        print("Points :", polydata.GetNumberOfPoints())
+        print("Polys :", polydata.GetNumberOfPolys())
+        cells = polydata.GetPolys()
+        print("Cell array :", cells)
+        points = numpy_support.vtk_to_numpy(polydata.GetPoints().GetData())
+        polys = numpy_support.vtk_to_numpy(polydata.GetPolys().GetData()).reshape(-1,4)
+        print(points.shape)
+        print(polys.shape)
+        print(polys[:5])
+
+        transform = vtk.vtkTransform()
+        transform.Scale(1000.0, 1000.0, 1000.0)
+        transformFilter = vtk.vtkTransformPolyDataFilter()
+        transformFilter.SetInputData(polydata)
+        transformFilter.SetTransform(transform)
+        transformFilter.Update()
+        polydata = transformFilter.GetOutput()
+        # Transformation rigide
 
         print("Points =", polydata.GetNumberOfPoints())
         # Nombre de sommets après triangulation.
@@ -206,14 +240,6 @@ class CTRVTKExporter:
         reader.Update()
         # Lit le fichier.
 
-        pd = reader.GetOutput()
-        # Récupère le maillage relu.
-
-        print("pd.GetNumberOfPoints =", pd.GetNumberOfPoints())
-        # Vérifie le nombre de sommets relus.
-
-        print("pd.GetNumberOfLines =", pd.GetNumberOfLines())
-        # Vérifie le nombre de lignes relues.
-
-        print("pd.GetNumberOfPolys =", pd.GetNumberOfPolys())
-        # Vérifie le nombre de triangles relus.
+        print("poly_int =", poly_int.GetNumberOfPoints())
+        print("poly_mid =", poly_mid.GetNumberOfPoints())
+        print("poly_ext =", poly_ext.GetNumberOfPoints())
