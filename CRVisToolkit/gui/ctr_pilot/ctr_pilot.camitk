@@ -1,0 +1,292 @@
+{
+    "camitk": {
+        "extensions": {
+            "actions": [
+                {
+                    "classification": {
+                        "family": "CTR"
+                    },
+                    "componentClass": "MeshComponent",
+                    "description": "CTR Pilot",
+                    "gui": "Default Action GUI",
+                    "name": "CTR Pilot",
+                    "parameters": [
+                        {
+                            "decimals": 4,
+                            "defaultValue": -0.015,
+                            "description": "Translation tube 1",
+                            "group": "",
+                            "maximum": 1,
+                            "minimum": -1,
+                            "name": "Q0",
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": -0.010,
+                            "description": "Translation tube 2",
+                            "group": "",
+                            "maximum": 1,
+                            "minimum": -1,
+                            "name": "Q1",
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": -0.005,
+                            "description": "Translation tube 3",
+                            "group": "",
+                            "maximum": 1,
+                            "minimum": -1,
+                            "name": "Q2",
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 0,
+                            "description": "Rotation tube 1",
+                            "group": "",
+                            "maximum": 6.283,
+                            "minimum": -6.283,
+                            "name": "Q3",
+                            "readOnly": false,
+                            "singleStep": 0.1,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 0,
+                            "description": "Rotation tube 2",
+                            "group": "",
+                            "maximum": 6.283,
+                            "minimum": -6.283,
+                            "name": "Q4",
+                            "readOnly": false,
+                            "singleStep": 0.1,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 0,
+                            "description": "Rotation tube 3",
+                            "group": "",
+                            "maximum": 6.283,
+                            "minimum": -6.283,
+                            "name": "Q5",
+                            "readOnly": false,
+                            "singleStep": 0.1,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 0.463,
+                            "description": "Longueur tube 1",
+                            "group": "",
+                            "name": "L1",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 0.3305,
+                            "description": "Longueur tube 2",
+                            "group": "",
+                            "name": "L2",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 0.199,
+                            "description": "Longueur tube 3",
+                            "group": "",
+                            "name": "L3",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 0.05,
+                            "description": "Longueur courbée tube 1",
+                            "group": "",
+                            "name": "L_k1",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 0.05,
+                            "description": "Longueur courbée tube 2",
+                            "group": "",
+                            "name": "L_k2",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 0.05,
+                            "description": "Longueur courbée tube 2",
+                            "group": "",
+                            "name": "L_k3",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 10,
+                            "description": "Courbure tube 1",
+                            "group": "",
+                            "name": "Ux1",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 5,
+                            "description": "Courbure tube 2",
+                            "group": "",
+                            "name": "Ux2",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 4,
+                            "defaultValue": 7,
+                            "description": "Courbure tube 3",
+                            "group": "",
+                            "name": "Ux3",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 6,
+                            "defaultValue": 0.000762,
+                            "description": "Rayon tube 1",
+                            "group": "",
+                            "name": "ROut1",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 6,
+                            "defaultValue": 0.0009,
+                            "description": "Rayon tube 2",
+                            "group": "",
+                            "name": "ROut2",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "decimals": 6,
+                            "defaultValue": 0.001175,
+                            "description": "Rayon tube 3",
+                            "group": "",
+                            "name": "ROut3",
+                            "minimum": 0,
+                            "readOnly": false,
+                            "singleStep": 0.001,
+                            "type": "double",
+                            "unit": ""
+                        },
+                        {
+                            "name": "BaseX",
+                            "type": "double",
+                            "defaultValue": -48.25
+                        },
+                        {
+                            "name": "BaseY",
+                            "type": "double",
+                            "defaultValue": -7.25
+                        },
+                        {
+                            "name": "BaseZ",
+                            "type": "double",
+                            "defaultValue": -7.25
+                        },
+                        {
+                            "name": "AxeX",
+                            "type": "double",
+                            "defaultValue": 0
+                        },
+                        {
+                            "name": "AxeY",
+                            "type": "double",
+                            "defaultValue": 0
+                        },
+                        {
+                            "name": "AxeZ",
+                            "type": "double",
+                            "defaultValue": 0
+                        }
+                    ]
+                }
+            ],
+            "applications": [
+            ],
+            "components": [
+            ],
+            "contact": {
+                "author": "Marouane Keteb",
+                "email": "ketebmarouane@gmail.com"
+            },
+            "description": "CTR Pilot",
+            "language": "Python",
+            "license": "LGPL-3 CamiTK",
+            "name": "CTR Pilot",
+            "requirements": [
+                "vtk",
+                "numpy",
+                "scipy"
+            ],
+            "viewers": [
+            ]
+        },
+        "timestamp": "2026-06-22T15:58:41",
+        "version": "camitk-6.0"
+    }
+}
