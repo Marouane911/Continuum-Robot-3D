@@ -73,3 +73,7 @@ class CTRData:
 
         self.theta_2 = matrix_data[17]
         self.theta_3 = matrix_data[18]
+
+        print(matrix_data.shape)
+        for i in range(matrix_data.shape[0]):
+            print(i, matrix_data[i].shape)

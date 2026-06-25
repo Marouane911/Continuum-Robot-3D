@@ -740,7 +740,7 @@ class MainApp(QMainWindow):
 
 
         # ==========================================================
-        # PARAMÈTRES PHYSIQUES (Friction & Longueur)
+        # PARAMÈTRES PHYSIQUES (Longueur)
         # ==========================================================
         params_group = QGroupBox("Paramètres physiques")
         params_layout = QGridLayout()
@@ -828,11 +828,11 @@ class MainApp(QMainWindow):
             self.param_inputs["l2"].value(),
             self.param_inputs["l3"].value()
         ]
-
+        
         for i in range(3):
 
             self.q_inputs[i].setRange(
-                -l_tubes[i]+0.015,
+                -l_tubes[i],
                 0.0
             )
 
@@ -1509,7 +1509,7 @@ class MainApp(QMainWindow):
                 )
             
             # Décoration minimale de l'axe
-            ax_chariots.set_xlim(-(l_tubes[0]+0.005)*1000, 50) # Plage en fonction de la longueur du tube interne pour pouvoir le rentrer jusqu'à une heuteur epsilon
+            ax_chariots.set_xlim(-(l_tubes[0])*1000, 50) # Plage en fonction de la longueur du tube interne pour pouvoir le rentrer jusqu'à une heuteur epsilon
             ax_chariots.set_ylim(-1, 1)
             
             # Masquer complètement l'axe Y et affiner l'axe X

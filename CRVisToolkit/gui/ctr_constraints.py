@@ -10,14 +10,17 @@ class CTRConstraints:
 
         eps = 0.005
         
-        max_beta3 = -0.005
-        min_beta3 = -l3 + 0.009
+        max_beta3 = 0 # Je sais pas si c'est correct
+        min_beta3 = -l3+0.01 # Je sais pas si c'est correct
 
         q = list(q)
 
-        # =========================================================
+        # SÉCURITÉ : Limites physiques (On empêche de sortir des rails)
+        q[0] = max(-l1, min(0.0, q[0]))
+        q[1] = max(-l2, min(0.0, q[1]))
+        q[2] = max(-l3, min(0.0, q[2]))
+
         # MODE 1 : ENTRAÎNEMENT (Le chariot actif pousse/tire les autres)
-        # =========================================================
         if entrainement:
             
             # 1. Murs physiques (q[2] entraîne tout le monde vers l'avant/arrière)
@@ -71,9 +74,7 @@ class CTRConstraints:
             if q[0] > q[1] - eps: q[0] = q[1] - eps
 
 
-        # =========================================================
         # MODE 2 : BLOCAGE (Le chariot actif s'arrête s'il tape un obstacle)
-        # =========================================================
         else:
             # 1. Murs physiques stricts pour q[2]
             if q[2] > max_beta3: q[2] = max_beta3
