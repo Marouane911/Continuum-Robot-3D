@@ -1,0 +1,466 @@
+{
+    "camitk": {
+        "actions": {
+            "CTR Pilot": {
+                "AxeX": -150,
+                "AxeY": 9,
+                "AxeZ": 0,
+                "BaseX": 0,
+                "BaseY": -3.25,
+                "BaseZ": 1.75,
+                "L1": 0.463,
+                "L2": 0.3305,
+                "L3": 0.199,
+                "L_k1": 0.05,
+                "L_k2": 0.05,
+                "L_k3": 0.05,
+                "Q0": -0.132,
+                "Q1": -0.07250000000000001,
+                "Q2": -0.005,
+                "Q3": 0.20000000000000062,
+                "Q4": 1.9000000000000004,
+                "Q5": 1.7000000000000004,
+                "ROut1": 0.000762,
+                "ROut2": 0.0009,
+                "ROut3": 0.001175,
+                "Ux1": 10,
+                "Ux2": 5,
+                "Ux3": 7
+            },
+            "Meshes From Image": {
+                "Feature Angle": 120,
+                "Iterations": 20,
+                "Method": 0,
+                "Passband": 0.001,
+                "Relaxation Factor": 0.2,
+                "Selection Of Label Values": "",
+                "Smooth Meshes": true
+            },
+            "Open File": {
+                "File Name": "/tmp/robot_centerline.vtk"
+            },
+            "Otsu Threshold Filter": {
+                "Inside Value": 20,
+                "Outside Value": 255
+            },
+            "Pixel Color Changer": {
+                "Cube picking size in X": 1,
+                "Cube picking size in Y": 1,
+                "Cube picking size in Z": 1,
+                "New color": 255
+            },
+            "Resample": {
+                "New Image Scalar Type": 0,
+                "New Image X Dimension": 512,
+                "New Image Y Dimension": 512,
+                "New Image Z Dimension": 434
+            },
+            "Threshold (VTK)": {
+                "High Threshold": 1,
+                "In Value": 1,
+                "Low Threshold": 0.5,
+                "Out Value": 0,
+                "Replace Values": 2
+            }
+        },
+        "camitk-imp": {
+            "Auto Load Last Opened Component": false,
+            "Display Debug Information to Log Message": true,
+            "Display Time Stamp Information to Log Message": true,
+            "Log to File": false,
+            "Log to Standard Output": true,
+            "Logger Level": 3,
+            "Message Box Level": 2,
+            "Window Separator Size": 2
+        },
+        "components": [
+            {
+                "color": {
+                    "points": [
+                        1,
+                        1,
+                        0.7019607843137254,
+                        1
+                    ],
+                    "surface": [
+                        1,
+                        1,
+                        0.7019607843137254,
+                        1
+                    ],
+                    "wireframe": [
+                        1,
+                        1,
+                        0.7019607843137254,
+                        1
+                    ]
+                },
+                "filename": "",
+                "frame": "91d284c4-9bc6-454b-b831-56f87ebdea8c",
+                "properties": {
+                    "Name": "kidney_left3 (level 1)"
+                },
+                "renderingModes": 1
+            },
+            {
+                "color": {
+                    "points": [
+                        0,
+                        0,
+                        1,
+                        1
+                    ],
+                    "surface": [
+                        0.8,
+                        0.8,
+                        0.8,
+                        1
+                    ],
+                    "wireframe": [
+                        1,
+                        0,
+                        0,
+                        1
+                    ]
+                },
+                "filename": "../../../../../../tmp/robot_centerline.vtk",
+                "frame": "96927501-0bfd-4856-ad7a-1bc229a9ea0b",
+                "properties": {
+                    "Name": "vtk output"
+                },
+                "renderingModes": 1
+            }
+        ],
+        "mainwindow": {
+            "_q_styleSheetWidgetFont": "Ubuntu Sans,11,-1,5,50,0,0,0,0,0",
+            "acceptDrops": true,
+            "accessibleDescription": "",
+            "accessibleName": "",
+            "animated": true,
+            "autoFillBackground": false,
+            "baseSize": null,
+            "contextMenuPolicy": 1,
+            "cursor": null,
+            "dockNestingEnabled": false,
+            "dockOptions": 5,
+            "documentMode": false,
+            "enabled": true,
+            "focusPolicy": 0,
+            "font": "Ubuntu Sans,11,-1,5,50,0,0,0,0,0",
+            "geometry": "@Rect(66 69 1854 1131)",
+            "iconSize": null,
+            "inputMethodHints": 0,
+            "layoutDirection": 0,
+            "locale": null,
+            "maximumHeight": 16777215,
+            "maximumSize": null,
+            "maximumWidth": 16777215,
+            "minimumHeight": 583,
+            "minimumSize": null,
+            "minimumWidth": 640,
+            "mouseTracking": true,
+            "palette": null,
+            "pos": null,
+            "size": null,
+            "sizeIncrement": null,
+            "sizePolicy": null,
+            "statusTip": "",
+            "styleSheet": "QMainWindow::separator {           width: 2px;           height: 2px;         }         QMainWindow::separator:hover {           background: palette(highlight);         }",
+            "tabShape": 0,
+            "tabletTracking": false,
+            "toolButtonStyle": 0,
+            "toolTip": "",
+            "toolTipDuration": -1,
+            "unifiedTitleAndToolBarOnMac": false,
+            "updatesEnabled": true,
+            "visible": true,
+            "whatsThis": "",
+            "windowFilePath": "",
+            "windowIcon": null,
+            "windowIconText": "",
+            "windowModality": 0,
+            "windowModified": false,
+            "windowOpacity": 1,
+            "windowTitle": "imp - [ /tmp/robot_centerline.vtk ]"
+        },
+        "timestamp": "2026-06-25T15:25:30",
+        "transformationManager": {
+            "frames": [
+                {
+                    "anatomicalOrientation": {
+                    },
+                    "description": "CamiTK World Frame",
+                    "name": "🌐 World",
+                    "numberOfDimensions": 3,
+                    "units": [
+                        "",
+                        "",
+                        "",
+                        "",
+                        ""
+                    ],
+                    "uuid": "01234567-89ab-cdef-0123-456789abcdef"
+                },
+                {
+                    "anatomicalOrientation": {
+                        "code": "RAI",
+                        "maxLabels": [
+                            "L",
+                            "P",
+                            "S"
+                        ],
+                        "minLabels": [
+                            "R",
+                            "A",
+                            "I"
+                        ]
+                    },
+                    "description": "Main frame of image 'kidney_left3'",
+                    "name": "kidney_left3 (main)",
+                    "numberOfDimensions": 3,
+                    "units": [
+                        "",
+                        "",
+                        "",
+                        "",
+                        ""
+                    ],
+                    "uuid": "570c5dc6-b642-483a-a3f4-8bb594418d4a"
+                },
+                {
+                    "anatomicalOrientation": {
+                    },
+                    "description": "Data frame of image 'kidney_left3'",
+                    "name": "kidney_left3 (data)",
+                    "numberOfDimensions": 3,
+                    "units": [
+                        "",
+                        "",
+                        "",
+                        "",
+                        ""
+                    ],
+                    "uuid": "91d284c4-9bc6-454b-b831-56f87ebdea8c"
+                },
+                {
+                    "anatomicalOrientation": {
+                    },
+                    "description": "Frame of mesh 'vtk output'",
+                    "name": "vtk output",
+                    "numberOfDimensions": 3,
+                    "units": [
+                        "",
+                        "",
+                        "",
+                        "",
+                        ""
+                    ],
+                    "uuid": "96927501-0bfd-4856-ad7a-1bc229a9ea0b"
+                }
+            ],
+            "transformations": [
+                {
+                    "defaultIdentityToWorld": true,
+                    "description": "",
+                    "from": "570c5dc6-b642-483a-a3f4-8bb594418d4a",
+                    "matrix": [
+                        [
+                            1,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            1,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            1,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            1
+                        ]
+                    ],
+                    "name": "kidney_left3 (main) → 🌐 World",
+                    "to": "01234567-89ab-cdef-0123-456789abcdef",
+                    "type": "linear",
+                    "uuid": "a0a4dbb6-87e9-4576-afc2-c7896ad7cf25"
+                },
+                {
+                    "description": "",
+                    "from": "91d284c4-9bc6-454b-b831-56f87ebdea8c",
+                    "matrix": [
+                        [
+                            1,
+                            0,
+                            0,
+                            -164.654296875
+                        ],
+                        [
+                            0,
+                            1,
+                            0,
+                            40.654296875
+                        ],
+                        [
+                            0,
+                            0,
+                            1,
+                            -532
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            1
+                        ]
+                    ],
+                    "name": "kidney_left3 (data) → kidney_left3 (main)",
+                    "to": "570c5dc6-b642-483a-a3f4-8bb594418d4a",
+                    "type": "linear",
+                    "uuid": "6ec40045-c8d9-4bcd-937d-1bf2aeeb45ed"
+                },
+                {
+                    "defaultIdentityToWorld": true,
+                    "description": "",
+                    "from": "96927501-0bfd-4856-ad7a-1bc229a9ea0b",
+                    "matrix": [
+                        [
+                            1,
+                            0,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            1,
+                            0,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            1,
+                            0
+                        ],
+                        [
+                            0,
+                            0,
+                            0,
+                            1
+                        ]
+                    ],
+                    "name": "vtk output → 🌐 World",
+                    "to": "01234567-89ab-cdef-0123-456789abcdef",
+                    "type": "linear",
+                    "uuid": "5aceebf5-f6d2-43cb-928c-3c807c9600d0"
+                }
+            ]
+        },
+        "version": "camitk-6.0",
+        "viewers": {
+            "3D Viewer": {
+                "Auto Reset Camera": true,
+                "Backface culling": false,
+                "Background color": "#9a9996",
+                "Camera Orientation": 3,
+                "FXAA Antialiasing": true,
+                "Highlight Mode": 1,
+                "Lines considered as tube?": false,
+                "Point size?": 4,
+                "Screenshot button visible": false,
+                "Use a background gradient color?": true
+            },
+            "Action Viewer": {
+                "Show Search Panel": true
+            },
+            "Arbitrary Viewer": {
+                "Auto Reset Camera": true,
+                "Backface culling": false,
+                "Background color": "#000000",
+                "Camera Orientation": 0,
+                "FXAA Antialiasing": true,
+                "Highlight Mode": 1,
+                "Lines considered as tube?": false,
+                "Point size?": 4,
+                "Screenshot button visible": false,
+                "Use a background gradient color?": false
+            },
+            "Axial Viewer": {
+                "Auto Reset Camera": true,
+                "Backface culling": false,
+                "Background color": "#000000",
+                "Camera Orientation": 3,
+                "FXAA Antialiasing": true,
+                "Highlight Mode": 1,
+                "Lines considered as tube?": false,
+                "Point size?": 4,
+                "Screenshot button visible": false,
+                "Use a background gradient color?": false
+            },
+            "Bitmap Viewer": {
+                "Auto Reset Camera": true,
+                "Backface culling": false,
+                "Background color": "#000000",
+                "Camera Orientation": 3,
+                "FXAA Antialiasing": true,
+                "Highlight Mode": 1,
+                "Lines considered as tube?": false,
+                "Point size?": 4,
+                "Screenshot button visible": false,
+                "Use a background gradient color?": false
+            },
+            "Coronal Viewer": {
+                "Auto Reset Camera": true,
+                "Backface culling": false,
+                "Background color": "#000000",
+                "Camera Orientation": 4,
+                "FXAA Antialiasing": true,
+                "Highlight Mode": 1,
+                "Lines considered as tube?": false,
+                "Point size?": 4,
+                "Screenshot button visible": false,
+                "Use a background gradient color?": false
+            },
+            "Medical Image Viewer": {
+                "Auto Reset Camera": true,
+                "Backface culling": false,
+                "Background color": "#9a9996",
+                "Camera Orientation": 3,
+                "FXAA Antialiasing": true,
+                "Highlight Mode": 1,
+                "Lines considered as tube?": false,
+                "Point size?": 4,
+                "Screenshot button visible": false,
+                "Use a background gradient color?": true
+            },
+            "Property Explorer": {
+                "View mode": 2
+            },
+            "Sagittal Viewer": {
+                "Auto Reset Camera": true,
+                "Backface culling": false,
+                "Background color": "#000000",
+                "Camera Orientation": 5,
+                "FXAA Antialiasing": true,
+                "Highlight Mode": 1,
+                "Lines considered as tube?": false,
+                "Point size?": 4,
+                "Screenshot button visible": false,
+                "Use a background gradient color?": false
+            },
+            "Text Viewer": {
+                "Background Color": "#ffffff",
+                "Text Color": "#0000ff"
+            }
+        }
+    }
+}

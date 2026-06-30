@@ -226,7 +226,7 @@ class MainApp(QMainWindow):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setFixedWidth(380)
+        scroll.setFixedWidth(500)
 
         control_panel = QWidget()
         control_layout = QVBoxLayout(control_panel)
@@ -513,7 +513,7 @@ class MainApp(QMainWindow):
         )
 
         self.steps_spinbox.setValue(
-            2
+            1
         )
 
         config_layout.addWidget(
@@ -1504,7 +1504,7 @@ class MainApp(QMainWindow):
                 # On utilise un marqueur vertical '|' très épais pour simuler la butée
                 ax_chariots.plot(
                     beta * 1000, 0, 
-                    marker='|', markersize=25, markeredgewidth=4, 
+                    marker='|', markersize=25, markeredgewidth=3, 
                     color=colors[idx]
                 )
             

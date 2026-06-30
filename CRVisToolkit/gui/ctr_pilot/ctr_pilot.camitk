@@ -6,7 +6,7 @@
                     "classification": {
                         "family": "CTR"
                     },
-                    "componentClass": "MeshComponent",
+                    "componentClass": "Component",
                     "description": "CTR Pilot",
                     "gui": "Default Action GUI",
                     "name": "CTR Pilot",
@@ -236,17 +236,17 @@
                         {
                             "name": "BaseX",
                             "type": "double",
-                            "defaultValue": -48.25
+                            "defaultValue": 0
                         },
                         {
                             "name": "BaseY",
                             "type": "double",
-                            "defaultValue": -7.25
+                            "defaultValue": 0
                         },
                         {
                             "name": "BaseZ",
                             "type": "double",
-                            "defaultValue": -7.25
+                            "defaultValue": 0
                         },
                         {
                             "name": "AxeX",

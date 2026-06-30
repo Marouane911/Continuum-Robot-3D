@@ -2,6 +2,8 @@ import camitk
 import sys
 import csv
 import vtk
+import numpy as np
+from scipy.spatial.transform import Rotation
 
 sys.path.append("/home/ketebm/Projet/Continuum-Robot-3D/CRVisToolkit/gui")
 
@@ -16,7 +18,7 @@ from ctr_constraints import CTRConstraints
 
 def process(self):
 
-    camitk.warning("PROCESS CALLED")
+    # camitk.warning("PROCESS CALLED")
 
     # 1. Lecture brute des translations actuelles
     q_brut = [
@@ -28,6 +30,13 @@ def process(self):
     # 2. Sécurité : Création de la mémoire au premier lancement
     if not hasattr(self, 'prev_q'):
         self.prev_q = list(q_brut)
+
+    if not hasattr(self, 'last_valid_q'):
+        # On sauvegarde l'état initial (censé être sain) des 6 variables
+        q3_init = self.getParameterValue("Q3")
+        q4_init = self.getParameterValue("Q4")
+        q5_init = self.getParameterValue("Q5")
+        self.last_valid_q = q_brut + [q3_init, q4_init, q5_init]
 
     # 3. Détection : Quel chariot vient d'être manipulé ?
     active_tube = 2 # Externe par défaut
@@ -43,7 +52,8 @@ def process(self):
         self.getParameterValue("L3")
     ]
 
-    # 5. Garde-fou physique (L'entraînement)
+
+    # Garde-fou physique (L'entraînement)
     q_corrige = CTRConstraints.enforce_telescopic_constraints(
         q=q_brut,
         active=active_tube,
@@ -51,35 +61,23 @@ def process(self):
         tubes_lengths=l_tubes
     )
 
-    # 6. Rétroaction visuelle : Si la physique a bougé un tube, on met à jour l'interface
-    if q_brut != q_corrige:
-        # camitk.warning("Entraînement activé : Ajustement automatique des chariots.")
+    # Rétroaction visuelle : Si la physique a bougé un tube, on met à jour l'interface
+    if any(abs(q_brut[i] - q_corrige[i]) > 1e-6 for i in range(3)):
         self.setParameterValue("Q0", float(q_corrige[0]))
         self.setParameterValue("Q1", float(q_corrige[1]))
         self.setParameterValue("Q2", float(q_corrige[2]))
+        self.prev_q = list(q_corrige)
+    else:
+        self.prev_q = list(q_corrige)
+    
 
-    # 7. On mémorise la position valide pour le prochain clic
-    self.prev_q = list(q_corrige)
-
-    # 8. Affectation finale des variables pour la suite de ton script
+    # Affectation finale des variables
     q0, q1, q2 = q_corrige[0], q_corrige[1], q_corrige[2]
+    l1, l2, l3 = l_tubes[0], l_tubes[1], l_tubes[2]
 
     q3 = self.getParameterValue("Q3")
     q4 = self.getParameterValue("Q4")
     q5 = self.getParameterValue("Q5")
-
-    l1, l2, l3 = l_tubes[0], l_tubes[1], l_tubes[2]
-
-    # q0 = self.getParameterValue("Q0")
-    # q1 = self.getParameterValue("Q1")
-    # q2 = self.getParameterValue("Q2")
-    # q3 = self.getParameterValue("Q3")
-    # q4 = self.getParameterValue("Q4")
-    # q5 = self.getParameterValue("Q5")
-
-    # l1  = self.getParameterValue("L1")
-    # l2  = self.getParameterValue("L2")
-    # l3  = self.getParameterValue("L3")
 
     l_k1 = self.getParameterValue("L_k1")
     l_k2 = self.getParameterValue("L_k2")
@@ -147,21 +145,32 @@ def process(self):
     result = CTRSolver.run(
         root_toolkit="/home/ketebm/Projet/Continuum-Robot-3D/CRVisToolkit",
         q_values=[q0, q1, q2, q3, q4, q5],
-        params_path="/home/ketebm/Projet/Continuum-Robot-3D/CRVisToolkit/python/parameters_temp.csv"
+        params_path=csv_path
     )
 
     # camitk.warning(f"Succès du solveur : {result['success']}")
 
-    if not result["success"]:
-        camitk.warning(f"{str(result)}, restauration des anciens paramètres")
-        # On réécrit immédiatement l'ancienne sauvegarde dans le CSV
+    if not result["success"]: # CRASH DU SOLVER (Modèle mathématique)
+        
+        camitk.warning(f"{str(result)} : restauration des anciens paramètres")
+        
+        # On réécrit immédiatement l'ancienne sauvegarde dans le CSV actuel car le CSV acuel est cassé
         with open(csv_path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
-            writer.writerow(backup_row) # On utilise le backup !
+            writer.writerow(backup_row)
+        
+        for i in range(6):
+            self.setParameterValue(f"Q{i}", float(self.last_valid_q[i])) # restauration des paramètres de translation et rotation
+
+        # Restauration de la détection de chariot pour le prochain tour
+        self.prev_q = list(self.last_valid_q[:3])
+        
         return False
 
     # camitk.warning("Calcul réussi, mise à jour du mesh ...")
+    # Si le calcul a réussi, on met à jour notre référence
+    self.last_valid_q = [q0, q1, q2, q3, q4, q5]
 
     steps = CTRLoader.load(
         "/home/ketebm/Projet/Continuum-Robot-3D/"
@@ -174,7 +183,6 @@ def process(self):
         return False
 
     step = steps[0]
-
     data = CTRData(
         step["matrix"],
         step["iEnd"],
@@ -204,15 +212,19 @@ def process(self):
 
     # Transformation Globale (translation et rotation)
     transform = vtk.vtkTransform()
-    transform.Translate(base_x, base_y, base_z)
-    transform.RotateZ(rot_z)
-    transform.RotateY(rot_y)
-    transform.RotateX(rot_x)
+
+    # transform.Translate(base_x, base_y, base_z)
+
+    # transform.RotateZ(rot_z)
+    # transform.RotateY(rot_y)
+    # transform.RotateX(rot_x)
+
     # Application de la transformation sur le maillage 3D
-    transform_filter = vtk.vtkTransformPolyDataFilter()
+    transform_filter = vtk.vtkTransformPolyDataFilter() # transformer les coordonnées des points
     transform_filter.SetInputData(polydata)
     transform_filter.SetTransform(transform)
     transform_filter.Update()
+    
     # Récupération du maillage après ses transformations de translation et rotation globale
     polydata_transforme = transform_filter.GetOutput()
 
@@ -221,13 +233,55 @@ def process(self):
         polydata_transforme.GetPoints().GetData()
     )
 
+    P_tip = points[-1]
+
     polys = numpy_support.vtk_to_numpy(
         polydata_transforme.GetPolys().GetData()
     ).reshape(-1, 4)
 
-    mesh = self.getTargets()[0]
 
-    old_points = mesh.getPointSetAsNumpy()
+    mesh = None
+    image = None
+
+    for target in self.getTargets():
+
+        mesh_component = target.as_type("MeshComponent")
+        if mesh_component is not None:
+            mesh = mesh_component
+
+        image_component = target.as_type("ImageComponent")
+        if image_component is not None:
+            image = image_component
+    
+    # Vérification
+    # camitk.warning(f"mesh = {mesh}")
+    # camitk.warning(f"image = {image}")
+    
+    
+    # if image is not None:
+        
+    #     # 1. Sécurité pour créer un seul plan durant la session pour éviter de générer un plan par "apply"
+    #     if not hasattr(self, "tipSlice"):
+    #         self.tipSlice = camitk.ObliqueSliceComponent(image)
+    #         self.tipSlice.setPropertyValue("Relative Rotation", True)
+    #         self.refreshApplication()
+        
+    #     self.tipSlice.setPropertyValue(
+    #         "Translation",
+    #         (
+    #             float(P_tip[0]),
+    #             float(P_tip[1]),
+    #             float(P_tip[2])
+    #         )
+    #     )
+
+    #     self.tipSlice.setPropertyValue(
+    #         "Rotation",
+    #         (60.0, 0.0, 0.0)
+    #     )
+
+
+    # old_points = mesh.getPointSetAsNumpy()
 
     # camitk.warning(
     #     f"OLD={old_points.shape[0]} NEW={points.shape[0]}"
@@ -237,11 +291,59 @@ def process(self):
     #     f"NEW_POLYS={polys.shape[0]}"
     # )
 
-    if old_points.shape[0] != points.shape[0]:
-        # camitk.warning("Topology changed")
-        return True
+    # if old_points.shape[0] != points.shape[0]:
+    #     camitk.warning("Topology changed")
+    #     return True
 
     mesh.replacePointSet(points)
+
+
+
+    frames = camitk.TransformationManager.getFramesOfReference()
+
+    robot_frame = next(
+        f for f in frames
+        if f.getName() == "vtk output"
+    )
+
+    data_frame = next(
+        f for f in frames
+        if f.getName().endswith("(data)")
+    )
+
+    robot_data_exists = any(
+        (T.getFrom() == robot_frame and T.getTo() == data_frame) or
+        (T.getFrom() == data_frame and T.getTo() == robot_frame)
+        for T in camitk.TransformationManager.getTransformations()
+    )
+
+    if not robot_data_exists:
+        camitk.TransformationManager.addTransformation(
+            robot_frame,
+            data_frame
+        )
+
+    rotation = Rotation.from_euler(
+        'zyx',
+        [rot_z, rot_y, rot_x],
+        degrees=True
+    )
+
+    T_robot_data = np.eye(4)
+
+    T_robot_data[:3, :3] = rotation.as_matrix()
+
+    T_robot_data[:3, 3] = [
+        float(base_x),
+        float(base_y),
+        float(base_z)
+    ]
+
+    camitk.TransformationManager.updateTransformation(
+        robot_frame,
+        data_frame,
+        T_robot_data.tolist()
+    )
 
     camitk.refresh()
 
